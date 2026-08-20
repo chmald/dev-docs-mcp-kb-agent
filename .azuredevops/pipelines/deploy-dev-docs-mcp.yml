@@ -1,0 +1,76 @@
+# .azuredevops/pipelines/deploy-dev-docs-mcp.yml
+#
+# Minimal validate + deploy skeleton. NOTE: the Deploy stage assumes
+# demo-ids.local.json is available to the agent (materialized from a prior
+# infra/deploy.ps1 run, or reconstructed from the variable group in a fuller
+# CI/CD setup) -- for a first customer build, run infra/deploy.ps1 manually
+# and commit the pipeline as the validate-on-PR gate before wiring full
+# unattended deploys.
+
+trigger:
+  branches:
+    include: [main, dev, prod]
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - group: dev-docs-mcp-env-$(Build.SourceBranchName)   # dev-docs-mcp-env-dev, dev-docs-mcp-env-prod, etc.
+
+stages:
+  - stage: Validate
+    jobs:
+      - job: LintAndTest
+        steps:
+          - task: UsePythonVersion@0
+            inputs: { versionSpec: '3.11' }
+          - script: pip install -r scripts/requirements.txt
+            displayName: Install Python dependencies
+          - script: pytest tests/ -q
+            displayName: Run smoke tests
+          - task: AzureCLI@2
+            displayName: Bicep what-if
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: pscore
+              scriptLocation: inlineScript
+              inlineScript: |
+                az deployment group what-if `
+                  --resource-group $(resourceGroup) `
+                  --template-file infra/main.bicep `
+                  --parameters infra/main.parameters.json `
+                  --parameters environment=$(environment) location=$(region)
+
+  - stage: Deploy
+    dependsOn: Validate
+    condition: in(variables['Build.SourceBranchName'], 'dev', 'prod')
+    jobs:
+      - deployment: DeployInfra
+        environment: dev-docs-mcp-$(Build.SourceBranchName)
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureCLI@2
+                  displayName: Deploy Bicep
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: pscore
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      az deployment group create `
+                        --resource-group $(resourceGroup) `
+                        --template-file infra/main.bicep `
+                        --parameters infra/main.parameters.json `
+                        --parameters environment=$(environment) location=$(region) deployFallbackServer=$(deployFallbackServer)
+                - task: AzureCLI@2
+                  displayName: Run ingestion + Knowledge Base setup
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      pip install -r scripts/requirements.txt
+                      python scripts/post_deploy_search.py --ids-file demo-ids.local.json --create-index --create-skillset --create-indexer --run-indexer
+                      python scripts/post_deploy_search.py --ids-file demo-ids.local.json --create-knowledge-base
+                      python scripts/post_deploy_search.py --ids-file demo-ids.local.json --check-mcp-endpoint

@@ -1,0 +1,147 @@
+<mxfile host="Electron" agent="DailyDriver" version="26.0.0">
+  <diagram id="dev-docs-mcp-knowledge-agent-architecture" name="Reference Architecture">
+    <mxGraphModel dx="2000" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1050" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Developer Docs MCP Knowledge Base &#8212; Reference Architecture" style="text;html=1;align=center;verticalAlign=middle;fontSize=20;fontStyle=1;fontColor=#323130" vertex="1" parent="1">
+          <mxGeometry x="40" y="16" width="1820" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="AI Search Knowledge Base exposed as an MCP endpoint (native + custom fallback) for direct GitHub Copilot / VS Code consumption" style="text;html=1;align=center;verticalAlign=middle;fontSize=12;fontStyle=2;fontColor=#605E5C" vertex="1" parent="1">
+          <mxGeometry x="40" y="54" width="1820" height="24" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Layer containers ============ -->
+        <mxCell id="g_source" value="Tier 1 &#8212; Source" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#605E5C;dashed=1;verticalAlign=top;fontStyle=1;fontSize=13;fontColor=#605E5C" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="230" height="780" as="geometry" />
+        </mxCell>
+        <mxCell id="g_ingest" value="Tier 2 &#8212; Ingestion" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#0078D4;dashed=1;verticalAlign=top;fontStyle=1;fontSize=13;fontColor=#0078D4" vertex="1" parent="1">
+          <mxGeometry x="300" y="100" width="330" height="780" as="geometry" />
+        </mxCell>
+        <mxCell id="g_platform" value="Tier 3 &#8212; Platform" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#5C2D91;dashed=1;verticalAlign=top;fontStyle=1;fontSize=13;fontColor=#5C2D91" vertex="1" parent="1">
+          <mxGeometry x="660" y="100" width="380" height="780" as="geometry" />
+        </mxCell>
+        <mxCell id="g_agent" value="Tier 4 &#8212; Agent / MCP Surface" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#5C2D91;dashed=1;verticalAlign=top;fontStyle=1;fontSize=13;fontColor=#5C2D91;strokeWidth=2" vertex="1" parent="1">
+          <mxGeometry x="1070" y="100" width="430" height="780" as="geometry" />
+        </mxCell>
+        <mxCell id="g_consume" value="Tier 5 &#8212; Developer Consumption" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#036C70;dashed=1;verticalAlign=top;fontStyle=1;fontSize=13;fontColor=#036C70" vertex="1" parent="1">
+          <mxGeometry x="1530" y="100" width="300" height="780" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Tier 1 — Source ============ -->
+        <mxCell id="doc_corpus" value="&#128196; Technical document corpus&#10;(datasheets, firmware manuals,&#10;API specs &#8212; PDF)&#10;&#10;bring your own" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#605E5C;dashed=1;fontSize=11;fontStyle=1;fontColor=#323130;align=center;verticalAlign=middle;arcSize=12;strokeWidth=2" vertex="1" parent="1">
+          <mxGeometry x="70" y="170" width="170" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="doc_note" value="No sample corpus bundled.&#10;See samples/README.md.&#10;&#10;Check vendor redistribution&#10;rights before including a&#10;datasheet in a shared demo." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#605E5C;fontSize=10;fontColor=#323130;align=left;verticalAlign=top;arcSize=8;strokeWidth=2;spacing=6" vertex="1" parent="1">
+          <mxGeometry x="70" y="300" width="170" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Tier 2 — Ingestion ============ -->
+        <mxCell id="blob" value="Blob Storage&#10;raw container" style="aspect=fixed;html=1;points=[];align=center;image;fontSize=11;image=img/lib/azure2/storage/Storage_Accounts.svg;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;labelBackgroundColor=none;" vertex="1" parent="1">
+          <mxGeometry x="433" y="170" width="64" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="indexer" value="&#128269; AI Search Indexer&#10;data source: ds-documents-blob" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=2;fontSize=11;fontStyle=1;fontColor=#5C2D91;align=center;verticalAlign=middle;arcSize=12" vertex="1" parent="1">
+          <mxGeometry x="330" y="290" width="270" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="skillset" value="Skillset: skillset-documents&#10;&#10;1. Document Layout skill&#10;2. Split skill (heading/page-aware)&#10;3. AOAI Embedding skill (vectorizer)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=2;fontSize=11;fontStyle=1;fontColor=#5C2D91;align=left;verticalAlign=middle;arcSize=12;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="330" y="390" width="270" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest_note" value="Indexer runs on-demand or&#10;scheduled (e.g. every 4h);&#10;re-run after corpus updates." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#0078D4;fontSize=10;fontColor=#323130;align=left;verticalAlign=top;arcSize=8;strokeWidth=2;spacing=6" vertex="1" parent="1">
+          <mxGeometry x="330" y="560" width="270" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Tier 3 — Platform ============ -->
+        <mxCell id="foundry_box" value="Microsoft Foundry multi-service account&#10;(kind: AIServices) &#8212; one resource,&#10;one endpoint, one RBAC surface" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#5C2D91;dashed=1;verticalAlign=top;fontStyle=1;fontSize=10;fontColor=#5C2D91" vertex="1" parent="1">
+          <mxGeometry x="690" y="170" width="320" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="doc_intel" value="Document Intelligence&#10;Layout model" style="aspect=fixed;html=1;points=[];align=center;image;fontSize=11;image=img/lib/azure2/ai_machine_learning/Form_Recognizers.svg;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;labelBackgroundColor=none;" vertex="1" parent="1">
+          <mxGeometry x="710" y="250" width="64" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="aoai" value="Azure OpenAI&#10;text-embedding-3-large&#10;+ gpt-4o-mini" style="aspect=fixed;html=1;points=[];align=center;image;fontSize=11;image=img/lib/azure2/ai_machine_learning/Azure_OpenAI.svg;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;labelBackgroundColor=none;" vertex="1" parent="1">
+          <mxGeometry x="900" y="250" width="64" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="search_index" value="AI Search Index&#10;idx-documents" style="aspect=fixed;html=1;points=[];align=center;image;fontSize=11;image=img/lib/azure2/app_services/Search_Services.svg;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;labelBackgroundColor=none;" vertex="1" parent="1">
+          <mxGeometry x="710" y="460" width="64" height="64" as="geometry" />
+        </mxCell>
+        <mxCell id="index_schema_note" value="content &#183; contentVector &#183;&#10;sourceDocument &#183; pageNumber &#183;&#10;sectionHeading &#183; sourceUri&#10;&#10;Semantic ranker + hybrid&#10;(keyword + vector) search" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#5C2D91;fontSize=10;fontColor=#323130;align=left;verticalAlign=top;arcSize=8;strokeWidth=2;spacing=6" vertex="1" parent="1">
+          <mxGeometry x="690" y="560" width="320" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Tier 4 — Agent / MCP surface ============ -->
+        <mxCell id="know_agent" value="&#129504; AI Search Knowledge Base&#10;(agentic retrieval &#8212; query planning&#10;+ synthesis)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=3;fontSize=11;fontStyle=1;fontColor=#5C2D91;align=center;verticalAlign=middle;arcSize=12" vertex="1" parent="1">
+          <mxGeometry x="1100" y="170" width="290" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="seam_note" value="DUAL MCP EXPOSURE&#10;&#10;Native = zero custom code (primary)&#10;Fallback = guarantees a working demo&#10;if the native preview isn't enabled&#10;on your Search tier/region" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF4CE;strokeColor=#B7791F;fontSize=10;fontColor=#323130;align=left;verticalAlign=top;arcSize=8;strokeWidth=3;fontStyle=1;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="1100" y="270" width="290" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="mcp_native" value="Native MCP endpoint&#10;POST /knowledgebases/name/mcp" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=2;fontSize=11;fontStyle=1;fontColor=#5C2D91;align=center;verticalAlign=middle;arcSize=12" vertex="1" parent="1">
+          <mxGeometry x="1100" y="400" width="290" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="preview_warn" value="&#9888; Preview capability &#8212; verify&#10;exact path / API version /&#10;auth mode at deployment time" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FDE7E9;strokeColor=#A4262C;fontSize=10;fontColor=#A4262C;align=left;verticalAlign=top;arcSize=8;strokeWidth=2;spacing=6;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1100" y="480" width="290" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="mcp_fallback" value="&#9889; Fallback: custom MCP server&#10;(Container App or local stdio)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0078D4;strokeWidth=2;fontSize=11;fontStyle=1;fontColor=#0078D4;align=center;verticalAlign=middle;arcSize=12" vertex="1" parent="1">
+          <mxGeometry x="1100" y="580" width="290" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="key_vault" value="Key Vault&#10;admin/query key" style="aspect=fixed;html=1;points=[];align=center;image;fontSize=11;image=img/lib/azure2/security/Key_Vaults.svg;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;labelBackgroundColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="670" width="64" height="64" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Tier 5 — Developer consumption ============ -->
+        <mxCell id="vscode" value="&#128187; VS Code +&#10;GitHub Copilot&#10;(agent mode)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#036C70;strokeWidth=2;fontSize=12;fontStyle=1;fontColor=#036C70;align=center;verticalAlign=middle;arcSize=12" vertex="1" parent="1">
+          <mxGeometry x="1600" y="170" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="mcp_json_note" value="Workspace .vscode/mcp.json&#10;points at native or fallback&#10;endpoint.&#10;&#10;Team-committed; no per-dev&#10;secret hardcoded in the file." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#036C70;fontSize=10;fontColor=#323130;align=left;verticalAlign=top;arcSize=8;strokeWidth=2;spacing=6" vertex="1" parent="1">
+          <mxGeometry x="1560" y="290" width="240" height="130" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Bottom decision strip ============ -->
+        <mxCell id="decisions" value="KEY LOCKED DECISIONS &#8212; Foundry multi-service consolidation (one resource for Document Intelligence + Azure OpenAI) &#183; Dual MCP exposure (native primary, custom fallback) so the demo works even where the preview surface isn't enabled &#183; GitHub Copilot / VS Code as the sole v1 consumption surface. Full rationale: 01-architecture.md &#167; Locked decisions &#8212; rationale." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#323130;fontSize=11;fontColor=#323130;align=left;verticalAlign=middle;arcSize=8;strokeWidth=2;spacing=10" vertex="1" parent="1">
+          <mxGeometry x="40" y="900" width="1790" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- ============ Edges ============ -->
+        <mxCell id="e1" value="upload&#10;(upload_documents.py)" style="endArrow=classic;html=1;strokeColor=#605E5C;strokeWidth=2;fontSize=10;fontColor=#605E5C;align=center;verticalAlign=bottom" edge="1" parent="1" source="doc_corpus" target="blob">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="endArrow=classic;html=1;strokeColor=#0078D4;strokeWidth=2" edge="1" parent="1" source="blob" target="indexer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" style="endArrow=classic;html=1;strokeColor=#0078D4;strokeWidth=2" edge="1" parent="1" source="indexer" target="skillset">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="layout extraction" style="endArrow=classic;html=1;strokeColor=#5C2D91;strokeWidth=2;fontSize=10;fontColor=#5C2D91;align=center;verticalAlign=bottom" edge="1" parent="1" source="skillset" target="doc_intel">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="embeddings" style="endArrow=classic;html=1;strokeColor=#5C2D91;strokeWidth=2;fontSize=10;fontColor=#5C2D91;align=center;verticalAlign=bottom" edge="1" parent="1" source="skillset" target="aoai">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="writes chunks" style="endArrow=classic;html=1;strokeColor=#5C2D91;strokeWidth=2;fontSize=10;fontColor=#5C2D91;align=center;verticalAlign=bottom" edge="1" parent="1" source="skillset" target="search_index">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" style="endArrow=classic;html=1;strokeColor=#5C2D91;strokeWidth=2" edge="1" parent="1" source="search_index" target="know_agent">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="query planning + synthesis" style="endArrow=classic;html=1;strokeColor=#5C2D91;strokeWidth=2;dashed=1;fontSize=10;fontColor=#5C2D91;align=center;verticalAlign=bottom" edge="1" parent="1" source="know_agent" target="aoai">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" style="endArrow=classic;html=1;strokeColor=#5C2D91;strokeWidth=2" edge="1" parent="1" source="know_agent" target="mcp_native">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="direct hybrid+semantic query,&#10;no Knowledge Base required" style="endArrow=classic;html=1;strokeColor=#0078D4;strokeWidth=2;dashed=1;fontSize=10;fontColor=#0078D4;align=center;verticalAlign=bottom" edge="1" parent="1" source="search_index" target="mcp_fallback">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="secrets" style="endArrow=classic;html=1;strokeColor=#0078D4;strokeWidth=2;dashed=1;fontSize=10;fontColor=#0078D4;align=center;verticalAlign=bottom" edge="1" parent="1" source="key_vault" target="mcp_fallback">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="Streamable HTTP&#10;MCP tool call" style="endArrow=classic;html=1;strokeColor=#5C2D91;strokeWidth=2;fontSize=10;fontColor=#5C2D91;align=center;verticalAlign=bottom" edge="1" parent="1" source="mcp_native" target="vscode">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="Streamable HTTP or stdio" style="endArrow=classic;html=1;strokeColor=#0078D4;strokeWidth=2;fontSize=10;fontColor=#0078D4;align=center;verticalAlign=bottom" edge="1" parent="1" source="mcp_fallback" target="vscode">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

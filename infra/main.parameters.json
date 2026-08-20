@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environment": {
+      "value": "dev"
+    },
+    "location": {
+      "value": "eastus2"
+    },
+    "workload": {
+      "value": "ddmcp"
+    },
+    "deployFallbackServer": {
+      "value": false
+    },
+    "deployerPrincipalId": {
+      "value": ""
+    },
+    "deployerPrincipalType": {
+      "value": "User"
+    },
+    "searchSku": {
+      "value": "basic"
+    },
+    "embeddingModelName": {
+      "value": "text-embedding-3-large"
+    },
+    "chatModelName": {
+      "value": "gpt-5-mini"
+    }
+  }
+}

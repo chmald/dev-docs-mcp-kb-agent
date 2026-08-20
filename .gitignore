@@ -1,0 +1,40 @@
+# Python / virtualenv
+__pycache__/
+*.pyc
+.venv/
+.env
+.pytest_cache/
+scripts/.deps-installed
+
+# IDE / editor
+.vscode/
+
+# Local-only secrets and credentials (NEVER commit)
+.sp-secret.json
+*.pem
+*.key
+secrets.json
+*.env.local
+
+# Local deployment state / Terraform / Bicep what-if outputs
+.terraform/
+*.tfstate
+*.tfstate.backup
+.bicep_what_if.json
+
+# Deployment ID snapshots populated post-deploy — keep the template, gitignore the populated copy
+demo-ids.local.json
+*.local.json
+
+# Container build artifacts
+*.log
+
+# Bring-your-own test/sample corpus documents -- never commit a real (possibly
+# copyrighted) vendor datasheet/manual. See samples/README.md and
+# tests/fixtures/README.md.
+tests/fixtures/*.pdf
+samples/*.pdf
+
+# OS junk
+.DS_Store
+Thumbs.db

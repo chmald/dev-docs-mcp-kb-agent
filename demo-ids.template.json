@@ -1,0 +1,68 @@
+{
+  "_template": true,
+  "_note": "Populate this file with the IDs that result from a deployment of this pattern. Copy to demo-ids.local.json (gitignored) and populate the local copy. Pipelines / scripts do NOT read this file at runtime -- runtime values come from ADO variable groups or your CI tool's secret store. infra/deploy.ps1 auto-writes the Azure-resource fields below on every successful deploy.",
+  "_reusability_note": "The ingestion pipeline (index schema, skillset, Knowledge Base) is corpus-neutral -- the ONLY block you need to change to point this pattern at a different document domain is `corpus` below. See docs/01-architecture.md 'Adapting this pattern to another document corpus'.",
+  "azureFieldsSource": "infra/main.bicep deploymentSummary output (written by infra/deploy.ps1)",
+  "consumedBy": [
+    "scripts/upload_documents.py (reads storageAccount, rawContainer, corpus.sourceFileExtensions)",
+    "scripts/post_deploy_search.py (reads searchEndpoint, searchAdminKeySecretName, foundryOpenAIEndpoint, embeddingDeployment, embeddingDimensions, documentIntelligenceEndpoint, storageAccount, rawContainer, searchIndexName, searchSkillsetName, searchDataSourceName, searchIndexerName, knowledgeBaseName, chatDeployment, corpus.*)",
+    "scripts/mcp_fallback_server.py (reads searchEndpoint, searchIndexName, knowledgeBaseName, keyVaultUri)",
+    "scripts/deploy_mcp_server.ps1 (reads containerRegistry, containerAppsEnvironment, containerAppName, resourceGroup, corpus.mcpToolName, corpus.mcpToolDescription)"
+  ],
+
+  "corpus": {
+    "_note": "The ONLY corpus-specific configuration in this pattern. Change these to retarget the same pipeline at HR policies, contracts, research papers, API references, etc. Everything else is generic.",
+    "displayName": "technical documentation",
+    "mcpToolName": "retrieve_technical_docs",
+    "mcpToolDescription": "Search the hardware datasheet and firmware reference documentation corpus and return grounded, cited passages. Use this for questions about register values, pin configuration, electrical characteristics, timing, and peripheral behavior. Each result cites its source document, page number, and section heading.",
+    "chunkSizeTokens": 1500,
+    "chunkOverlapTokens": 200,
+    "sourceFileExtensions": [".pdf"]
+  },
+
+  "tenantId": "<entra-tenant-guid>",
+  "subscriptionId": "<azure-subscription-guid>",
+  "adoOrg": "<your-ado-org>",
+  "adoProject": "<your-ado-project>",
+  "adoRepo": "dev-docs-mcp-knowledge-agent",
+  "adoRemote": "https://dev.azure.com/<org>/<project>/_git/dev-docs-mcp-knowledge-agent",
+  "environment": "<env — dev | test | prod>",
+  "region": "<primary-region — e.g. eastus2>",
+  "resourceGroup": "rg-ddmcp-<env>-<region>",
+
+  "storageAccount": "stddmcp<env><region>",
+  "blobEndpoint": "https://stddmcp<env><region>.blob.core.windows.net/",
+  "rawContainer": "raw",
+
+  "foundryResource": "aif-ddmcp-<env>-<region>",
+  "foundryOpenAIEndpoint": "https://aif-ddmcp-<env>-<region>.openai.azure.com",
+  "documentIntelligenceEndpoint": "https://aif-ddmcp-<env>-<region>.cognitiveservices.azure.com/",
+  "aiServicesSubdomainUrl": "<optional — subdomain URL for the skillset's billable AI Services attachment; defaults to documentIntelligenceEndpoint. Set explicitly if your Foundry resource uses the https://<name>.services.ai.azure.com form>",
+  "embeddingDeployment": "embedding",
+  "embeddingModel": "text-embedding-3-large",
+  "embeddingDimensions": 3072,
+  "chatDeployment": "chat",
+  "chatModel": "gpt-5-mini",
+
+  "searchService": "srch-ddmcp-<env>-<region>",
+  "searchEndpoint": "https://srch-ddmcp-<env>-<region>.search.windows.net",
+  "searchIndexName": "idx-documents",
+  "searchSkillsetName": "skillset-documents",
+  "searchDataSourceName": "ds-documents-blob",
+  "searchIndexerName": "ixr-documents",
+  "knowledgeSourceName": "ks-documents",
+  "knowledgeBaseName": "kb-documents",
+  "mcpEndpointAvailability": "<native | wrapper-required — populated by post_deploy_search.py --check-mcp-endpoint>",
+  "searchPrincipalId": "<auto-populated — AI Search system-assigned MI object ID>",
+
+  "keyVault": "kv-ddmcp-<env>-<region>",
+  "keyVaultUri": "https://kv-ddmcp-<env>-<region>.vault.azure.net/",
+  "searchAdminKeySecretName": "search-admin-key",
+
+  "_fallback_mcp_server_fields_populated_only_if_deployed": {
+    "containerRegistry": "acrddmcp<env><region>",
+    "containerAppsEnvironment": "cae-ddmcp-<env>-<region>",
+    "containerAppName": "ca-mcp-ddmcp-<env>-<region>",
+    "containerAppFqdn": "<auto-populated after deploy_mcp_server.ps1 runs>"
+  }
+}
