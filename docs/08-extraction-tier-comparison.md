@@ -376,10 +376,10 @@ rather than choosing.
 
   The indexers set `maxFailedItems: 10` so a flaky document does not halt the run — the AI
   Search default of `0` stops everything on the first failure, leaving every remaining document
-  unprocessed. **Retrying a failed document requires re-uploading that blob**, not just
-  re-running the indexer: change tracking treats an attempted-and-failed document as seen, so a
-  plain re-run reports `processed=0 failed=0` and skips it. Re-uploading bumps `LastModified`
-  and retries only that document, avoiding a full-corpus `--reset` and the re-billing it causes.
+  unprocessed. **Retrying a failed document reliably requires `--reset`**: change tracking
+  treats an attempted-and-failed document as seen, so a plain re-run reports
+  `processed=0 failed=0`, and re-uploading the blob is timing-sensitive enough to silently
+  no-op. Budget for the fact that a retry re-bills the corpus.
 
   This is a **second, independent reason to split oversized PDFs** into ≤300-page parts — not
   only to clear Content Understanding's 300-page limit, but because smaller units make vision

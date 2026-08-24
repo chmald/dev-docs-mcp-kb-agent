@@ -20,6 +20,7 @@ Common failure modes and fixes for the Developer Docs MCP Knowledge Base pattern
 | Citations come back with empty source data | `includeReferenceSourceData` not set, or field missing from the knowledge source's `sourceDataFields` | § 2 |
 | Knowledge Base `retrieve` call returns empty/low-quality results | Semantic ranker not enabled, or query planning model not deployed | § 3 |
 | Retrieval returns HTTP 429 `exceeded rate limit` | Chat deployment TPM too low for agentic retrieval | § 7 |
+| Rows present for documents you deleted | Blob deletion doesn't remove index rows without a deletion detection policy | § 4 |
 | Vision skill fails: `did not execute within the time limit '00:00:30'` | **Request-rate throttling**, not model latency — deployment req/min ceiling below the concurrent burst | § 4 |
 | `Web Api skill response is invalid` + `upstream connect error` | Transient upstream failure in a long vision run — re-upload the failed blobs to retry them | § 4 |
 | MCP client gets "I cannot access external documents" instead of passages | Knowledge base `outputMode` is `answerSynthesis`; MCP needs `extractiveData` | § 3 |
@@ -171,6 +172,29 @@ Fixes, in order of preference:
 If capacity is already at the subscription quota ceiling (`InsufficientQuota` on the raise),
 splitting is the only remaining lever.
 
+**Symptom: rows for documents you deleted are still in the index.**
+Deleting a blob does **not** remove its rows. The indexer only *adds and updates* unless you
+configure a deletion detection policy on the data source, so a corpus that changes — or a
+re-split of the same source material — leaves orphaned rows behind and silently
+double-represents content.
+
+Observed live: re-splitting a 906-page specification from 300-page parts into 100-page parts
+left the old parts' rows in place, so the same pages existed twice under different
+`sourceDocument` values.
+
+| Situation | What to do |
+|---|---|
+| One-off corpus change during a demo build | Delete and recreate the index (`--teardown` then `--build`), then re-run ingestion |
+| Corpus that changes in production | Configure a [deletion detection policy](https://learn.microsoft.com/azure/search/search-howto-index-changed-deleted-blobs) on the blob data source (soft-delete or metadata-based) |
+
+Detect orphans by faceting on `sourceDocument` and comparing against what is actually in the
+container:
+
+```powershell
+$body = @{ search='*'; top=0; facets=@('sourceDocument,count:50') } | ConvertTo-Json
+# ...then compare with: az storage blob list --account-name <storage> --container-name raw --auth-mode login --query "[].name" -o tsv
+```
+
 **Symptom: `Web Api skill response is invalid` wrapping `InternalServerError: upstream connect error`.**
 Transient upstream failure during a long vision-heavy run. Expected at volume — figure
 verbalization makes hundreds of vision calls per run.
@@ -179,25 +203,31 @@ The indexers are created with `maxFailedItems: 10` so a flaky document does not 
 without that (the AI Search default is `0`) a single transient failure stops everything and
 every remaining document goes unprocessed.
 
-**To retry the failed documents, a plain re-run is NOT enough.** Blob change tracking treats an
-attempted-and-failed document as seen, so re-running the indexer reports
-`processed=0 failed=0` and skips them. Pick one:
+**To retry the failed documents, `--reset` is the only reliable method.** Blob change tracking
+treats an attempted-and-failed document as seen, so a plain re-run reports
+`processed=0 failed=0` and skips it.
 
-| Approach | Effect |
-|---|---|
-| **Re-upload just the failed blobs** (preferred) | Bumps `LastModified`, so change tracking picks up only those documents on the next run — no re-billing for the rest of the corpus |
-| `--reset` then run | Reprocesses the **entire** corpus and re-bills every page — only worth it if most documents failed |
+Re-uploading the failed blobs *seems* like the surgical fix, and it sometimes works — but it is
+**timing-sensitive and can silently no-op**. Change detection compares blob `LastModified`
+against the indexer's `lastFullEnumerationStartTime`; if the re-upload lands before that
+marker advances, the document is still considered seen and the run does nothing. Observed
+live: two consecutive re-upload-then-run cycles both returned `processed=0 failed=0`.
 
-Identify the failed documents from the indexer status:
+| Approach | Reliability | Cost |
+|---|---|---|
+| `--reset` then run | **Dependable** | Reprocesses the entire corpus and re-bills every page |
+| Re-upload the failed blobs, then run | Timing-dependent — verify `processed` actually increased | Cheap when it works |
+
+Inspect the tracking state to understand what the indexer thinks it has seen:
 
 ```powershell
 $ak = az search admin-key show -g <rg> --service-name <search> --query primaryKey -o tsv
-(Invoke-RestMethod -Uri "https://<search>.search.windows.net/indexers/ixr-hybrid-cu/status?api-version=2026-05-01-preview" `
-  -Headers @{'api-key'=$ak}).lastResult.errors | ForEach-Object { $_.key }
+$s = Invoke-RestMethod -Uri "https://<search>.search.windows.net/indexers/ixr-hybrid-cu/status?api-version=2026-05-01-preview" -Headers @{'api-key'=$ak}
+$s.lastResult.initialTrackingState; $s.lastResult.errors | ForEach-Object { $_.key }
 ```
 
-Repeated failures on the same document usually mean it is too large — split it (see
-[08 § the hybrid tier](./08-extraction-tier-comparison.md#dont-choose--route-the-hybrid-tier)).
+If a document fails **repeatedly** across resets, it is not transient — split it smaller (see
+below).
 
 ## 5 — GitHub Copilot / VS Code MCP client
 
