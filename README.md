@@ -58,6 +58,7 @@ All narrative documentation lives under `docs/`, in build order. The repo root h
 | docs/06-mcp-endpoint-and-fallback-server.md | Deep dive: native Knowledge Base MCP endpoint + the optional custom wrapper |
 | docs/07-github-copilot-mcp-client-setup.md | Deep dive: wiring VS Code / GitHub Copilot to the MCP endpoint |
 | **docs/08-extraction-tier-comparison.md** | **The "why both services" doc** — DI-only vs CU-only vs hybrid, measured; the 300-page limit; figure verbalization; model selection; and the **cost model**. Read this before quoting a customer. |
+| **docs/09-findings-and-lessons.md** | **Every defect, constraint and gotcha** from two clean-room rebuilds, organised by symptom — including the errors whose messages point at the wrong cause, and corrections to guidance that proved wrong |
 | docs/assets/dev-docs-mcp-knowledge-agent-architecture.drawio | Presentation-ready architecture diagram (customer decks) |
 | infra/ | Bicep IaC (main template + modules) |
 | scripts/hybrid_ingest.py | **The production path** — page-count router, both ingestion tiers, unified index, knowledge base |
@@ -68,7 +69,22 @@ All narrative documentation lives under `docs/`, in build order. The repo root h
 | .azuredevops/pipelines/ | ADO validate + deploy pipeline |
 | demo-ids.template.json | Deployment IDs **+ the `corpus` block — the only corpus-specific configuration in the pattern** |
 
-Read `docs/00` through `docs/07` in order on first build. If you don't want to use the Bicep path, `docs/03b-manual-deployment.md` is a complete Bicep-free alternative to `docs/03-deployment.md` — everything else (02, 04, 05, 06, 07) applies to both paths unchanged.
+### Reading order
+
+| If you want to… | Read |
+|---|---|
+| **Build it** | `docs/00` → `docs/07` in order. `docs/03b` is a complete Bicep-free alternative to `docs/03`; everything else applies to both paths unchanged. |
+| **Understand why it uses two services** | `docs/01` for the design, then **`docs/08`** for the measured justification and cost model |
+| **Sell it** | **`docs/08`** — DI-only vs CU-only vs hybrid, on real numbers |
+| **Fix something** | `docs/05` (by symptom) and **`docs/09`** (every known defect and constraint) |
+
+### Platform support
+
+Windows, Linux, and macOS. `infra/deploy.ps1` runs under **PowerShell 7 (`pwsh`)**, which is
+cross-platform; the Python scripts and `az` commands are platform-neutral. The only command
+that differs per shell is virtual-environment activation — see
+[docs/02 § 0](./docs/02-prerequisites.md#0--tooling-and-shell-conventions). Every other command
+in these docs is written to paste cleanly into PowerShell, bash, or zsh.
 
 ---
 
@@ -127,4 +143,4 @@ This folder is checked into Azure DevOps as a standalone repo. `.gitignore` excl
 
 ---
 
-*Last updated: 2026-08-20*
+*Last updated: 2026-08-24*

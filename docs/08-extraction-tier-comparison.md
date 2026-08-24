@@ -21,7 +21,7 @@ DI-vs-CU question, and complementary to this one.
 
 ## Run it yourself
 
-```powershell
+```bash
 cd scripts
 python compare_extraction_tiers.py --ids-file ../demo-ids.local.json --build-cu   # stand up Tier B
 python compare_extraction_tiers.py --ids-file ../demo-ids.local.json --status     # poll ingestion
@@ -161,9 +161,15 @@ datasheets and ISA specs are routinely 500–1,500 pages.
 
 **Do this before choosing a tier:**
 
-```powershell
-# page count per PDF in your corpus (requires pdfinfo/poppler, or use any PDF tool)
-Get-ChildItem *.pdf | ForEach-Object { "{0}: {1}" -f $_.Name, (pdfinfo $_.FullName | Select-String '^Pages').ToString() }
+```bash
+# The router already does this -- it is the fastest way to see the split.
+python scripts/hybrid_ingest.py --ids-file demo-ids.local.json --plan --source-dir <corpus>
+```
+
+Or count pages directly with the same library the router uses (`pip install pypdf`):
+
+```bash
+python -c "import pathlib,sys; from pypdf import PdfReader; [print(f'{p.name}: {len(PdfReader(str(p)).pages)} pages') for p in sorted(pathlib.Path(sys.argv[1]).glob('*.pdf'))]" <corpus>
 ```
 
 If a meaningful share of the corpus exceeds 300 pages, you have three options:
@@ -210,7 +216,7 @@ Neither tier wins outright, so the pattern ships a **router** rather than a defa
                     ONE knowledge base → ONE MCP endpoint
 ```
 
-```powershell
+```bash
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --plan   --source-dir ../samples/corpus
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --upload --source-dir ../samples/corpus
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --build
@@ -356,9 +362,8 @@ rather than choosing.
   400 gives 400 requests/min. Size it against how many figures a single document contains,
   not against average token throughput:
 
-  ```powershell
-  az cognitiveservices account deployment show -n <foundry> -g <rg> --deployment-name vision `
-    --query "{cap:sku.capacity, limits:properties.rateLimits[].{key:key,count:count}}" -o json
+  ```bash
+  az cognitiveservices account deployment show -n <foundry> -g <rg> --deployment-name vision --query "{cap:sku.capacity, limits:properties.rateLimits[].{key:key,count:count}}" -o json
   ```
 
   If you cannot raise capacity far enough (subscription quota caps it), **split the document** —
@@ -557,7 +562,7 @@ Where the hybrid *does* win on cost is a corpus weighted toward documents **unde
 because every one of those pages moves from the $10 meter to the $5 (or $0.01) meter. The tier
 mix is the whole cost story — which is why `--plan` exists and why it calls no service:
 
-```powershell
+```bash
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --plan --source-dir <corpus>
 ```
 
@@ -715,4 +720,4 @@ committing a customer to it.
 
 ---
 
-*Last updated: 2026-08-20*
+*Last updated: 2026-08-24*

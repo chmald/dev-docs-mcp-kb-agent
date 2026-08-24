@@ -263,4 +263,4 @@ the cost. Run `--plan` against a real corpus before quoting anything.
 
 ---
 
-*Last updated: 2026-08-21*
+*Last updated: 2026-08-24*

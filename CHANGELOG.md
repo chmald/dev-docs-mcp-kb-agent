@@ -4,6 +4,51 @@ Change history for this pattern. Entries are listed newest-first.
 
 ---
 
+## 2026-08-24
+
+### Cross-platform docs, consolidated findings reference (v1.0.9)
+
+**All documentation now works on Windows, Linux, and macOS.** Nothing in the pattern was
+Windows-specific — `deploy.ps1` runs under PowerShell 7, which is cross-platform, and the
+Python scripts and `az` commands are platform-neutral — but every command block in the docs was
+written PowerShell-first and would not paste into bash.
+
+| Change | Effect |
+|---|---|
+| Joined **83** PowerShell backtick line-continuations into single-line commands | Multi-line continuation is the single biggest source of shell incompatibility (backtick vs backslash). Single-line commands paste cleanly into PowerShell, bash, and zsh |
+| Relabelled **44** shell-agnostic blocks from `powershell` to `bash` | Blocks now advertise what they actually are; 55 bash vs 10 PowerShell, and the remaining PowerShell blocks are genuinely PowerShell-only |
+| Replaced PowerShell-object diagnostics with `curl` / `az --query` | Tier-provenance checks, MCP probes, quota checks, orphan detection and indexer tracking-state inspection now run anywhere |
+| Added dual assignment blocks in `03b-manual-deployment.md` | Only variable *assignment* differs between shells — `$Rg` is *referenced* identically — so a single dual block per section covers the whole manual path |
+| Added **§ 0 Tooling and shell conventions** to `02-prerequisites.md` | Documents that virtual-environment activation is the only genuinely shell-specific step; after activation every command is identical everywhere |
+
+Verified: every markdown fence balanced, all internal links and anchors resolve, and the
+convention is stated explicitly so future edits stay portable.
+
+### New: docs/09 — Findings and lessons
+
+Consolidates everything two clean-room rebuilds surfaced into one reference organised **by
+symptom**, because the recurring theme was that the error message named the wrong cause:
+
+- **Failures that lie to you** — a vision "30s timeout" that was actually request-rate
+  throttling (real latency 6.6–7.5s); a 404 that was a missing `api-version`; a
+  `DeploymentIdNotFound` for a deployment that existed
+- **Silent failures** — `allowProjectManagement` stripped from the compiled template while
+  Bicep warned correctly and the warning was wrongly suppressed; Content Understanding figure
+  descriptions reporting success while producing zero output; reasoning models returning empty
+  content when the token budget is exhausted; orphaned index rows after a corpus change
+- **Teardown and rebuild** — soft-deleted Cognitive Services and in-flight AI Search deletes
+- **Ingestion at scale** — `maxFailedItems: 0` letting one flaky document block four healthy
+  ones; why `--reset` is the only reliable retry; why split size is driven by figure density
+  rather than page count
+- **Corrections to earlier guidance** — six documented claims that measurement later disproved,
+  recorded deliberately rather than quietly overwritten
+
+Headline lesson: **a pattern is not customer-ready until it has been built from zero, twice.**
+This one was authored, accuracy-reviewed against Microsoft Learn, and API-contract validated —
+three passes — and the first real deployment still hit nine defects, six of them hard blockers.
+
+---
+
 ## 2026-08-21
 
 ### Docs realigned to the hybrid, cost model added, and a clean-room rebuild (v1.0.8)
@@ -401,4 +446,4 @@ Honesty note carried through the docs: the native AI Search Knowledge Base → M
 
 ---
 
-*Last updated: 2026-08-20*
+*Last updated: 2026-08-24*

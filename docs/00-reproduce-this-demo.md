@@ -39,23 +39,43 @@ evidence and cost model behind that decision.
 
 ---
 
-## Pre-flight checklist
+## Before you start
 
 Full detail in [02-prerequisites.md](./02-prerequisites.md). Do not skip the first three —
-each one has cost a real build time.
+each has cost a real build time.
 
 - [ ] Azure subscription with Contributor + RBAC-admin on the target resource group
 - [ ] **AI Search regional _capacity_ confirmed** — a region can list Basic as available and
       still reject creation with `InsufficientResourcesAvailable`
 - [ ] **Storage / Key Vault public network access reachable** — governed subscriptions may
       force `publicNetworkAccess: Disabled` and silently revert an override
-- [ ] Model quota in-region for `text-embedding-3-large` (**Standard** SKU) and your chosen
-      frontier chat/vision models
-- [ ] Local tools: `az` CLI ≥ 2.60, PowerShell 7+, Python 3.11+
-      (`pip install -r scripts/requirements.txt` covers the Python side, `pypdf` included)
+- [ ] Model quota in-region for `text-embedding-3-large` (**Standard** SKU) and the chat/vision
+      models
+- [ ] `az` CLI ≥ 2.60, **PowerShell 7 (`pwsh`)**, Python 3.11+
 - [ ] **VS Code with the GitHub Copilot Chat extension** (`github.copilot-chat`) — note
       `ms-azuretools.vscode-azure-github-copilot` is a *different* extension and is not enough
 - [ ] A PDF corpus you have the right to index (see [../samples/README.md](../samples/README.md))
+
+### Platform note
+
+Everything here runs on **Windows, Linux, and macOS**. `deploy.ps1` runs under PowerShell 7,
+which is cross-platform. Activate the virtual environment first — that is the only step whose
+syntax differs per shell — and every command below is then identical everywhere:
+
+```powershell
+# PowerShell (any OS)
+python -m venv .venv
+.venv/Scripts/Activate.ps1        # Windows
+# .venv/bin/Activate.ps1          # Linux / macOS
+pip install -r scripts/requirements.txt
+```
+
+```bash
+# bash / zsh
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r scripts/requirements.txt
+```
 
 ---
 
@@ -68,7 +88,7 @@ Never trust the ambient `az` login — see
 
 ### A2. Deploy the Bicep
 
-```powershell
+```bash
 cd infra
 ./deploy.ps1 -Environment dev -Region eastus -ResourceGroup "rg-ddmcp-dev-eastus"
 ```
@@ -82,7 +102,7 @@ Key Vault, and RBAC, then writes `demo-ids.local.json`. Detail:
 The Bicep creates the embedding + chat deployments. Add the two frontier deployments the
 hybrid uses (names must match `demo-ids.local.json`):
 
-```powershell
+```bash
 # Figure verbalization, BOTH tiers. Deliberately a NON-reasoning model: the
 # vision skill has a fixed 30s timeout whose failure mode is total (one slow
 # figure fails the whole document), so latency variance matters more than
@@ -94,14 +114,10 @@ hybrid uses (names must match `demo-ids.local.json`):
 # removed from the skill in API 2026-04-01 -- so there is no way to throttle
 # from the AI Search side. Under-provision this and ingestion fails with a
 # misleading 30s *timeout* even though each call takes ~7s.
-az cognitiveservices account deployment create -n <foundry> -g <rg> `
-  --deployment-name vision --model-name gpt-4.1 --model-version 2025-04-14 `
-  --model-format OpenAI --sku-name GlobalStandard --sku-capacity 1000
+az cognitiveservices account deployment create -n <foundry> -g <rg> --deployment-name vision --model-name gpt-4.1 --model-version 2025-04-14 --model-format OpenAI --sku-name GlobalStandard --sku-capacity 1000
 
 # Knowledge-base query planning. Frontier -- no timeout pressure here.
-az cognitiveservices account deployment create -n <foundry> -g <rg> `
-  --deployment-name sol --model-name gpt-5.6-sol --model-version 2026-07-09 `
-  --model-format OpenAI --sku-name GlobalStandard --sku-capacity 200
+az cognitiveservices account deployment create -n <foundry> -g <rg> --deployment-name sol --model-name gpt-5.6-sol --model-version 2026-07-09 --model-format OpenAI --sku-name GlobalStandard --sku-capacity 200
 ```
 
 > A brand-new deployment is not immediately usable, and it fails in three different-looking
@@ -118,7 +134,7 @@ az cognitiveservices account deployment create -n <foundry> -g <rg> `
 
 ### B1. Split oversized documents (strongly recommended)
 
-```powershell
+```bash
 cd ../scripts
 pip install -r requirements.txt
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --split --plan --source-dir "<path-to-pdfs>"
@@ -140,7 +156,7 @@ document. Skip `--split` only if every document is already under 300 pages.
 
 ### B2. See the routing plan (free — no service calls)
 
-```powershell
+```bash
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --plan --source-dir "<path-to-pdfs>"
 ```
 
@@ -149,7 +165,7 @@ This is also the number you need for a cost estimate — see
 
 ### B3. Upload into the tier prefixes
 
-```powershell
+```bash
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --upload --source-dir "<split-or-original-dir>"
 ```
 
@@ -159,7 +175,7 @@ python hybrid_ingest.py --ids-file ../demo-ids.local.json --upload --source-dir 
 
 ## Part C — Build both tiers and ingest
 
-```powershell
+```bash
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --build
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --status
 ```
@@ -174,7 +190,7 @@ tiers report `success`.
 **Checkpoint:** both indexers `success`, and the index contains rows from every tier you
 expected:
 
-```powershell
+```bash
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --status
 ```
 
@@ -184,7 +200,7 @@ Full detail: [03-deployment.md § Phase 2](./03-deployment.md#phase-2--hybrid-in
 
 ## Part D — Verify retrieval and the MCP endpoint
 
-```powershell
+```bash
 python post_deploy_search.py --ids-file ../demo-ids.local.json --check-mcp-endpoint
 ```
 
@@ -221,7 +237,7 @@ Then run [04-testing.md](./04-testing.md) before calling it demo-ready. If anyth
 
 ## Tearing down
 
-```powershell
+```bash
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --teardown   # Search objects only
 az group delete --name rg-ddmcp-dev-eastus --yes --no-wait             # everything
 ```
@@ -231,4 +247,4 @@ in use.
 
 ---
 
-*Last updated: 2026-08-21*
+*Last updated: 2026-08-24*

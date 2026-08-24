@@ -30,14 +30,17 @@ in the reference build.
 
 > **Multi-tenant safety.** The active `az`/`azd` account drifts between tenants. Set it explicitly before building — never trust the ambient login.
 
-```powershell
-$TenantId       = "<entra-tenant-guid>"        # from demo-ids.local.json once you have one
-$SubscriptionId = "<azure-subscription-guid>"
+```bash
+# 1. Verify which tenant/subscription az is currently pointed at
+az account show --query "{tenant:tenantId, subscription:id, name:name}" -o table
 
-az account show --query "{tenant:tenantId, subscription:id, name:name}" -o table   # verify
-# If it does not match the target:
-az login --tenant $TenantId                    # add --use-device-code when headless
-az account set --subscription $SubscriptionId
+# 2. If it does NOT match your intended target, correct it.
+#    Substitute your own values -- they are in demo-ids.local.json once you have one.
+az login --tenant <entra-tenant-guid>          # add --use-device-code when headless
+az account set --subscription <azure-subscription-guid>
+
+# 3. Re-verify before deploying anything
+az account show --query "{tenant:tenantId, subscription:id, name:name}" -o table
 ```
 
 ### Phase 0 validation
@@ -50,14 +53,16 @@ az account set --subscription $SubscriptionId
 
 ### 1.1 Create the resource group
 
-```powershell
-$Env = "dev"; $Region = "eastus2"
-az group create --name "rg-ddmcp-$Env-$Region" --location $Region
+```bash
+az group create --name rg-ddmcp-dev-eastus --location eastus
 ```
+
+> `deploy.ps1` creates the resource group for you if it does not exist, so this step is
+> optional — it is here for the manual/portal path.
 
 ### 1.2 Deploy the Bicep template
 
-```powershell
+```bash
 cd infra
 ./deploy.ps1 -Environment $Env -Region $Region -ResourceGroup "rg-ddmcp-$Env-$Region"
 ```
@@ -77,7 +82,7 @@ cd infra
 
 Confirm the automatic role assignments from `rbac.bicep`:
 
-```powershell
+```bash
 az role assignment list --resource-group "rg-ddmcp-$Env-$Region" -o table
 ```
 
@@ -102,7 +107,7 @@ The Bicep creates `embedding` and `chat`. The hybrid additionally needs two fron
 deployments — names must match `demo-ids.local.json` (`frontierDeployment`,
 `cuModelDeployment`):
 
-```powershell
+```bash
 # Figure verbalization, BOTH tiers. Deliberately a NON-reasoning model: the
 # vision skill has a fixed 30s timeout whose failure mode is total (one slow
 # figure fails the whole document), so latency variance matters more than
@@ -114,14 +119,10 @@ deployments — names must match `demo-ids.local.json` (`frontierDeployment`,
 # removed from the skill in API 2026-04-01 -- so there is no way to throttle
 # from the AI Search side. Under-provision this and ingestion fails with a
 # misleading 30s *timeout* even though each call takes ~7s.
-az cognitiveservices account deployment create -n <foundry> -g <rg> `
-  --deployment-name vision --model-name gpt-4.1 --model-version 2025-04-14 `
-  --model-format OpenAI --sku-name GlobalStandard --sku-capacity 1000
+az cognitiveservices account deployment create -n <foundry> -g <rg> --deployment-name vision --model-name gpt-4.1 --model-version 2025-04-14 --model-format OpenAI --sku-name GlobalStandard --sku-capacity 1000
 
 # Knowledge-base query planning. Frontier -- no timeout pressure here.
-az cognitiveservices account deployment create -n <foundry> -g <rg> `
-  --deployment-name sol --model-name gpt-5.6-sol --model-version 2026-07-09 `
-  --model-format OpenAI --sku-name GlobalStandard --sku-capacity 200
+az cognitiveservices account deployment create -n <foundry> -g <rg> --deployment-name sol --model-name gpt-5.6-sol --model-version 2026-07-09 --model-format OpenAI --sku-name GlobalStandard --sku-capacity 200
 ```
 
 > A brand-new deployment takes a few minutes to become usable, and the failure looks like
@@ -137,7 +138,7 @@ az cognitiveservices account deployment create -n <foundry> -g <rg> `
 
 ### 2.2 Route the corpus (free — no service calls)
 
-```powershell
+```bash
 cd ../scripts
 pip install -r requirements.txt
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --plan --source-dir "<path-to-your-pdfs>"
@@ -153,7 +154,7 @@ rights.
 
 ### 2.3 Upload into the tier prefixes
 
-```powershell
+```bash
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --upload --source-dir "<path-to-your-pdfs>"
 ```
 
@@ -163,7 +164,7 @@ scope to a prefix.
 
 ### 2.4 Build both tiers and ingest
 
-```powershell
+```bash
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --build
 ```
 
@@ -182,7 +183,7 @@ then starts both indexers.
 
 ### 2.5 Confirm ingestion succeeded
 
-```powershell
+```bash
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --status
 ```
 
@@ -219,7 +220,7 @@ phase is the short version.*
 
 ### 3.2 Verify the native MCP endpoint
 
-```powershell
+```bash
 python post_deploy_search.py --ids-file ../demo-ids.local.json --check-mcp-endpoint
 ```
 
@@ -238,7 +239,7 @@ wrapper is optional and was **not** needed in the reference build.
 
 *Full reference in [docs/06-mcp-endpoint-and-fallback-server.md](./06-mcp-endpoint-and-fallback-server.md). This wrapper is not required for a working demo — see § 4 there for why you might still want it (token lifecycle, custom processing, network controls).*
 
-```powershell
+```bash
 cd ../infra
 ./deploy.ps1 -Environment $Env -Region $Region -ResourceGroup "rg-ddmcp-$Env-$Region" -DeployFallbackServer
 cd ../scripts
@@ -283,4 +284,4 @@ cd ../scripts
 
 ---
 
-*Last updated: 2026-08-21*
+*Last updated: 2026-08-24*

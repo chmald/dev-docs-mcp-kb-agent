@@ -40,7 +40,7 @@ earning their place**. Run these after [03-deployment.md](./03-deployment.md).
 
 ## B — Chunk-quality audit (do not skip)
 
-```powershell
+```bash
 cd scripts
 python compare_extraction_tiers.py --ids-file ../demo-ids.local.json --audit
 ```
@@ -65,7 +65,7 @@ across the board.
 
 Build 5–10 question/answer pairs from your own corpus, then:
 
-```powershell
+```bash
 python compare_extraction_tiers.py --ids-file ../demo-ids.local.json --golden
 ```
 
@@ -86,15 +86,25 @@ distinguishes a working hybrid from a pipeline that quietly discarded every diag
 
 ## D — Tier provenance (is the hybrid actually hybrid?)
 
-A single unified index makes it easy to *assume* both tiers contributed. Verify it:
+A single unified index makes it easy to *assume* both tiers contributed. Verify it.
+
+**Any platform** — `curl` ships with Windows 10+, Linux and macOS:
+
+```bash
+AK=$(az search admin-key show -g <rg> --service-name <search> --query primaryKey -o tsv)
+curl -s -X POST "https://<search>.search.windows.net/indexes/idx-documents-hybrid/docs/search?api-version=2026-05-01-preview" -H "api-key: $AK" -H "Content-Type: application/json" -d '{"search":"*","top":0,"count":true,"facets":["extractionTier","contentKind","sourceDocument,count:50"]}'
+```
+
+<details>
+<summary>PowerShell equivalent (nicer output formatting)</summary>
 
 ```powershell
 $ak = az search admin-key show -g <rg> --service-name <search> --query primaryKey -o tsv
-$body = @{ search='*'; top=0; count=$true; facets=@('extractionTier','contentKind','sourceDocument') } | ConvertTo-Json
-Invoke-RestMethod -Uri "https://<search>.search.windows.net/indexes/idx-documents-hybrid/docs/search?api-version=2026-05-01-preview" `
-  -Method Post -Headers @{'api-key'=$ak;'Content-Type'='application/json'} -Body $body |
-  Select-Object -ExpandProperty '@search.facets'
+$body = @{ search='*'; top=0; count=$true; facets=@('extractionTier','contentKind','sourceDocument,count:50') } | ConvertTo-Json
+Invoke-RestMethod -Uri "https://<search>.search.windows.net/indexes/idx-documents-hybrid/docs/search?api-version=2026-05-01-preview" -Method Post -Headers @{'api-key'=$ak;'Content-Type'='application/json'} -Body $body | Select-Object -ExpandProperty '@search.facets'
 ```
+
+</details>
 
 | Check | Pass |
 |---|---|
@@ -107,7 +117,7 @@ which 334 `image-description`, across 2 of 2 documents.
 
 Then confirm a single query draws on **both** tiers:
 
-```powershell
+```bash
 python compare_extraction_tiers.py --ids-file ../demo-ids.local.json --report
 ```
 
@@ -127,7 +137,7 @@ python compare_extraction_tiers.py --ids-file ../demo-ids.local.json --report
 
 ## F — Regression checklist
 
-```powershell
+```bash
 python -m pytest tests -q          # 52 tests
 az bicep build --file infra/main.bicep --stdout > $null
 ```
@@ -150,4 +160,4 @@ methodology guards, and model-configuration guards.
 
 ---
 
-*Last updated: 2026-08-21*
+*Last updated: 2026-08-24*

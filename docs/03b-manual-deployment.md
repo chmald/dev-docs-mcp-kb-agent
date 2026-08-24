@@ -31,14 +31,33 @@ Identical to the Bicep path — see [03-deployment.md § Phase 0](./03-deploymen
 
 Set shared variables first (PowerShell):
 
+> **Shell note.** Only variable *assignment* differs between shells — `$Rg`, `$Storage` and
+> friends are *referenced* identically in PowerShell and bash, so every command after this
+> block is the same on all platforms. Set the variables using whichever form matches your shell.
+
 ```powershell
-$Env = "dev"; $Region = "eastus2"; $Workload = "ddmcp"
+# PowerShell (any OS)
+$Env = "dev"; $Region = "eastus"; $Workload = "ddmcp"
 $Rg = "rg-$Workload-$Env-$Region"
-$Storage = "st$Workload$Env$Region"          # e.g. stddmcpdeveastus2 -- lowercase, no hyphens, <=24 chars
+$Storage = "st$Workload$Env$Region"          # lowercase, no hyphens, <=24 chars
 $Foundry = "aif-$Workload-$Env-$Region"
 $Search  = "srch-$Workload-$Env-$Region"
 $Kv      = "kv-$Workload-$Env-$Region"        # <=24 chars
+```
 
+```bash
+# bash / zsh
+Env=dev; Region=eastus; Workload=ddmcp
+Rg="rg-$Workload-$Env-$Region"
+Storage="st$Workload$Env$Region"             # lowercase, no hyphens, <=24 chars
+Foundry="aif-$Workload-$Env-$Region"
+Search="srch-$Workload-$Env-$Region"
+Kv="kv-$Workload-$Env-$Region"               # <=24 chars
+```
+
+Then, on any platform:
+
+```bash
 az group create --name $Rg --location $Region
 ```
 
@@ -46,69 +65,41 @@ az group create --name $Rg --location $Region
 
 ### 1.1 Storage account + `raw` container
 
-```powershell
-az storage account create `
-  --name $Storage --resource-group $Rg --location $Region `
-  --sku Standard_LRS --kind StorageV2 `
-  --min-tls-version TLS1_2 --allow-blob-public-access false --https-only true
+```bash
+az storage account create --name $Storage --resource-group $Rg --location $Region --sku Standard_LRS --kind StorageV2 --min-tls-version TLS1_2 --allow-blob-public-access false --https-only true
 
-az storage container create `
-  --account-name $Storage --name raw --public-access off `
-  --auth-mode login
+az storage container create --account-name $Storage --name raw --public-access off --auth-mode login
 ```
 
 **Portal equivalent:** Storage accounts → + Create (Standard_LRS, StorageV2, `Secure transfer required` = Enabled, `Allow Blob public access` = Disabled) → after creation, Containers → + Container named `raw`, Public access level = Private.
 
 ### 1.2 Foundry multi-service account (Document Intelligence + Azure OpenAI)
 
-```powershell
-az cognitiveservices account create `
-  --name $Foundry --resource-group $Rg --location $Region `
-  --kind AIServices --sku S0 `
-  --custom-domain $Foundry `
-  --assign-identity
+```bash
+az cognitiveservices account create --name $Foundry --resource-group $Rg --location $Region --kind AIServices --sku S0 --custom-domain $Foundry --assign-identity
 
 # A Foundry PROJECT is required -- without one, Content Understanding and other
 # Foundry-surfaced capabilities fail. The Bicep path creates this automatically;
 # the first manual build of this pattern had to add it by hand in the portal.
-az rest --method put `
-  --url "https://management.azure.com/subscriptions/$SubId/resourceGroups/$Rg/providers/Microsoft.CognitiveServices/accounts/$Foundry/projects/$Foundry-project?api-version=2025-06-01" `
-  --headers "Content-Type=application/json" `
-  --body "{`"location`":`"$Region`",`"identity`":{`"type`":`"SystemAssigned`"},`"properties`":{`"displayName`":`"$Foundry-project`"}}"
+az rest --method put --url "https://management.azure.com/subscriptions/$SubId/resourceGroups/$Rg/providers/Microsoft.CognitiveServices/accounts/$Foundry/projects/$Foundry-project?api-version=2025-06-01" --headers "Content-Type=application/json" --body "{`"location`":`"$Region`",`"identity`":{`"type`":`"SystemAssigned`"},`"properties`":{`"displayName`":`"$Foundry-project`"}}"
 
 # Model deployments -- verify current name/version/SKU against the Foundry model
 # catalog (https://learn.microsoft.com/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure)
 # before deploying; values below were current as of 2026-08-21.
-az cognitiveservices account deployment create `
-  --name $Foundry --resource-group $Rg `
-  --deployment-name embedding `
-  --model-name text-embedding-3-large --model-version "1" --model-format OpenAI `
-  --sku-name Standard --sku-capacity 30
+az cognitiveservices account deployment create --name $Foundry --resource-group $Rg --deployment-name embedding --model-name text-embedding-3-large --model-version "1" --model-format OpenAI --sku-name Standard --sku-capacity 30
 
 # Agentic retrieval spends this on query planning AND answer generation per call;
 # 10K TPM returns HTTP 429 on the very first query.
-az cognitiveservices account deployment create `
-  --name $Foundry --resource-group $Rg `
-  --deployment-name chat `
-  --model-name gpt-5-mini --model-version "2025-08-07" --model-format OpenAI `
-  --sku-name GlobalStandard --sku-capacity 150
+az cognitiveservices account deployment create --name $Foundry --resource-group $Rg --deployment-name chat --model-name gpt-5-mini --model-version "2025-08-07" --model-format OpenAI --sku-name GlobalStandard --sku-capacity 150
 
 # --- Frontier models used by the hybrid ingestion path ---------------------
 # Image verbalization + knowledge-base query planning (no model allowlist)
-az cognitiveservices account deployment create `
-  --name $Foundry --resource-group $Rg `
-  --deployment-name sol `
-  --model-name gpt-5.6-sol --model-version "2026-07-09" --model-format OpenAI `
-  --sku-name GlobalStandard --sku-capacity 200
+az cognitiveservices account deployment create --name $Foundry --resource-group $Rg --deployment-name sol --model-name gpt-5.6-sol --model-version "2026-07-09" --model-format OpenAI --sku-name GlobalStandard --sku-capacity 200
 
 # Content Understanding figure descriptions -- CU enforces its OWN model
 # allowlist that lags the Foundry catalog, so this is deliberately a different
 # (slightly older) model than `sol`. See docs/08 § Model selection.
-az cognitiveservices account deployment create `
-  --name $Foundry --resource-group $Rg `
-  --deployment-name cu-frontier `
-  --model-name gpt-5.5 --model-version "2026-04-24" --model-format OpenAI `
-  --sku-name GlobalStandard --sku-capacity 200
+az cognitiveservices account deployment create --name $Foundry --resource-group $Rg --deployment-name cu-frontier --model-name gpt-5.5 --model-version "2026-04-24" --model-format OpenAI --sku-name GlobalStandard --sku-capacity 200
 ```
 
 **Portal equivalent:** Azure AI Foundry portal (or Azure Portal → Azure AI services → + Create → "Azure AI services multi-service account") → kind `AIServices`, S0 pricing tier → create a **project** in the Foundry portal → then Deployments → + Deploy model, once each for `text-embedding-3-large`, `gpt-5-mini`, `gpt-5.6-sol`, and `gpt-5.5`.
@@ -119,17 +110,12 @@ az cognitiveservices account deployment create `
 
 ### 1.3 Azure AI Search
 
-```powershell
-az search service create `
-  --name $Search --resource-group $Rg --location $Region `
-  --sku basic --partition-count 1 --replica-count 1 `
-  --identity-type SystemAssigned
+```bash
+az search service create --name $Search --resource-group $Rg --location $Region --sku basic --partition-count 1 --replica-count 1 --identity-type SystemAssigned
 
 # Semantic ranker is a per-service setting not exposed by az search service create --
 # enable it via the portal (Settings -> Semantic ranker -> Enable) or:
-az rest --method PATCH `
-  --uri "https://management.azure.com/subscriptions/$(az account show --query id -o tsv)/resourceGroups/$Rg/providers/Microsoft.Search/searchServices/${Search}?api-version=2024-06-01-preview" `
-  --body '{"properties":{"semanticSearch":"standard"}}'
+az rest --method PATCH --uri "https://management.azure.com/subscriptions/$(az account show --query id -o tsv)/resourceGroups/$Rg/providers/Microsoft.Search/searchServices/${Search}?api-version=2024-06-01-preview" --body '{"properties":{"semanticSearch":"standard"}}'
 ```
 
 **Portal equivalent:** Azure AI Search → + Create → **Basic** tier (POC scale; use Standard S1+ for production) → after creation, Settings → Semantic ranker → Enable "Standard" plan.
@@ -138,11 +124,8 @@ az rest --method PATCH `
 
 ### 1.4 Key Vault
 
-```powershell
-az keyvault create `
-  --name $Kv --resource-group $Rg --location $Region `
-  --sku standard --enable-rbac-authorization true `
-  --enable-soft-delete true --retention-days 7
+```bash
+az keyvault create --name $Kv --resource-group $Rg --location $Region --sku standard --enable-rbac-authorization true --enable-soft-delete true --retention-days 7
 ```
 
 **Portal equivalent:** Key Vaults → + Create → Standard tier, "Azure role-based access control" permission model, soft-delete retention 7 days.
@@ -150,9 +133,20 @@ az keyvault create `
 ### 1.5 Store the Search admin key in Key Vault
 
 ```powershell
+# PowerShell
 $SearchAdminKey = az search admin-key show --service-name $Search --resource-group $Rg --query primaryKey -o tsv
 az keyvault secret set --vault-name $Kv --name search-admin-key --value $SearchAdminKey
 ```
+
+```bash
+# bash / zsh
+SearchAdminKey=$(az search admin-key show --service-name $Search --resource-group $Rg --query primaryKey -o tsv)
+az keyvault secret set --vault-name $Kv --name search-admin-key --value $SearchAdminKey
+```
+
+> In governed subscriptions this call can fail with `Public network access is disabled`. That is
+> expected and non-blocking — the setup scripts fall back to reading the key from the Search
+> control plane. See [05 § 1](./05-troubleshooting.md#1--foundation-bicep-deploy).
 
 You'll need `Key Vault Secrets Officer` on yourself first (see § 1.6) if RBAC authorization denies this call.
 
@@ -161,29 +155,34 @@ You'll need `Key Vault Secrets Officer` on yourself first (see § 1.6) if RBAC a
 Four role assignments, matching `infra/modules/rbac.bicep` exactly:
 
 ```powershell
+# PowerShell -- capture the three IDs the role assignments need
 $SubId = az account show --query id -o tsv
 $SearchPrincipalId = az search service show --name $Search --resource-group $Rg --query identity.principalId -o tsv
 $MyPrincipalId = az ad signed-in-user show --query id -o tsv          # or your deployer service principal's object ID
+```
+
+```bash
+# bash / zsh -- same three IDs
+SubId=$(az account show --query id -o tsv)
+SearchPrincipalId=$(az search service show --name $Search --resource-group $Rg --query identity.principalId -o tsv)
+MyPrincipalId=$(az ad signed-in-user show --query id -o tsv)          # or your deployer service principal's object ID
+```
+
+Then, on any platform:
+
+```bash
 
 # AI Search MI -> Storage Blob Data Reader (indexer reads raw PDFs)
-az role assignment create --assignee-object-id $SearchPrincipalId --assignee-principal-type ServicePrincipal `
-  --role "Storage Blob Data Reader" `
-  --scope "/subscriptions/$SubId/resourceGroups/$Rg/providers/Microsoft.Storage/storageAccounts/$Storage"
+az role assignment create --assignee-object-id $SearchPrincipalId --assignee-principal-type ServicePrincipal --role "Storage Blob Data Reader" --scope "/subscriptions/$SubId/resourceGroups/$Rg/providers/Microsoft.Storage/storageAccounts/$Storage"
 
 # AI Search MI -> Cognitive Services User (skillset calls Document Intelligence + AOAI embeddings)
-az role assignment create --assignee-object-id $SearchPrincipalId --assignee-principal-type ServicePrincipal `
-  --role "Cognitive Services User" `
-  --scope "/subscriptions/$SubId/resourceGroups/$Rg/providers/Microsoft.CognitiveServices/accounts/$Foundry"
+az role assignment create --assignee-object-id $SearchPrincipalId --assignee-principal-type ServicePrincipal --role "Cognitive Services User" --scope "/subscriptions/$SubId/resourceGroups/$Rg/providers/Microsoft.CognitiveServices/accounts/$Foundry"
 
 # You (deployer) -> Key Vault Secrets Officer (to write/read the search-admin-key secret)
-az role assignment create --assignee-object-id $MyPrincipalId --assignee-principal-type User `
-  --role "Key Vault Secrets Officer" `
-  --scope "/subscriptions/$SubId/resourceGroups/$Rg/providers/Microsoft.KeyVault/vaults/$Kv"
+az role assignment create --assignee-object-id $MyPrincipalId --assignee-principal-type User --role "Key Vault Secrets Officer" --scope "/subscriptions/$SubId/resourceGroups/$Rg/providers/Microsoft.KeyVault/vaults/$Kv"
 
 # You (deployer) -> Storage Blob Data Contributor (upload_documents.py needs data-plane write)
-az role assignment create --assignee-object-id $MyPrincipalId --assignee-principal-type User `
-  --role "Storage Blob Data Contributor" `
-  --scope "/subscriptions/$SubId/resourceGroups/$Rg/providers/Microsoft.Storage/storageAccounts/$Storage"
+az role assignment create --assignee-object-id $MyPrincipalId --assignee-principal-type User --role "Storage Blob Data Contributor" --scope "/subscriptions/$SubId/resourceGroups/$Rg/providers/Microsoft.Storage/storageAccounts/$Storage"
 ```
 
 **Portal equivalent:** each resource's **Access control (IAM)** blade → + Add role assignment → pick the role → assign to the AI Search service's managed identity (for the two Search MI assignments) or to yourself (for the two deployer assignments).
@@ -218,9 +217,22 @@ Copy `demo-ids.template.json` to `demo-ids.local.json` (gitignored) and fill in 
 Only do this if Phase 3's native MCP check returned `wrapper-required`, or you specifically want the wrapper's defense-in-depth features (see [docs/06 § 4](./06-mcp-endpoint-and-fallback-server.md#4--the-optional-custom-wrapper-server)).
 
 ```powershell
+# PowerShell
 $Registry = "acr$Workload$Env$Region"            # no hyphens, globally unique
 $CaeEnv   = "cae-$Workload-$Env-$Region"
 $CaName   = "ca-mcp-$Workload-$Env-$Region"
+```
+
+```bash
+# bash / zsh
+Registry="acr$Workload$Env$Region"               # no hyphens, globally unique
+CaeEnv="cae-$Workload-$Env-$Region"
+CaName="ca-mcp-$Workload-$Env-$Region"
+```
+
+Then, on any platform:
+
+```bash
 
 # Container Registry
 az acr create --name $Registry --resource-group $Rg --sku Basic --admin-enabled false
@@ -230,39 +242,23 @@ az monitor log-analytics workspace create --resource-group $Rg --workspace-name 
 $LogAnalyticsId = az monitor log-analytics workspace show --resource-group $Rg --workspace-name "$CaeEnv-logs" --query customerId -o tsv
 $LogAnalyticsKey = az monitor log-analytics workspace get-shared-keys --resource-group $Rg --workspace-name "$CaeEnv-logs" --query primarySharedKey -o tsv
 
-az containerapp env create `
-  --name $CaeEnv --resource-group $Rg --location $Region `
-  --logs-workspace-id $LogAnalyticsId --logs-workspace-key $LogAnalyticsKey
+az containerapp env create --name $CaeEnv --resource-group $Rg --location $Region --logs-workspace-id $LogAnalyticsId --logs-workspace-key $LogAnalyticsKey
 
 # Build the image (no local Docker required)
 az acr build --registry $Registry --image mcp-fallback-server:latest ../scripts
 
 # Create the Container App -- placeholder image on first create is fine;
 # the build above already pushed the real image to $Registry
-az containerapp create `
-  --name $CaName --resource-group $Rg --environment $CaeEnv `
-  --image "$Registry.azurecr.io/mcp-fallback-server:latest" `
-  --registry-server "$Registry.azurecr.io" `
-  --system-assigned `
-  --ingress external --target-port 8080 `
-  --cpu 0.5 --memory 1.0Gi `
-  --min-replicas 0 --max-replicas 2 `
-  --env-vars "SEARCH_ENDPOINT=$($ids.searchEndpoint)" "MCP_TRANSPORT=streamable-http"
+az containerapp create --name $CaName --resource-group $Rg --environment $CaeEnv --image "$Registry.azurecr.io/mcp-fallback-server:latest" --registry-server "$Registry.azurecr.io" --system-assigned --ingress external --target-port 8080 --cpu 0.5 --memory 1.0Gi --min-replicas 0 --max-replicas 2 --env-vars "SEARCH_ENDPOINT=$($ids.searchEndpoint)" "MCP_TRANSPORT=streamable-http"
 
 # Wire Key Vault access for the Container App's managed identity
 $CaPrincipalId = az containerapp show --name $CaName --resource-group $Rg --query identity.principalId -o tsv
-az role assignment create --assignee-object-id $CaPrincipalId --assignee-principal-type ServicePrincipal `
-  --role "Key Vault Secrets User" `
-  --scope "/subscriptions/$SubId/resourceGroups/$Rg/providers/Microsoft.KeyVault/vaults/$Kv"
-az role assignment create --assignee-object-id $CaPrincipalId --assignee-principal-type ServicePrincipal `
-  --role "AcrPull" `
-  --scope "/subscriptions/$SubId/resourceGroups/$Rg/providers/Microsoft.ContainerRegistry/registries/$Registry"
+az role assignment create --assignee-object-id $CaPrincipalId --assignee-principal-type ServicePrincipal --role "Key Vault Secrets User" --scope "/subscriptions/$SubId/resourceGroups/$Rg/providers/Microsoft.KeyVault/vaults/$Kv"
+az role assignment create --assignee-object-id $CaPrincipalId --assignee-principal-type ServicePrincipal --role "AcrPull" --scope "/subscriptions/$SubId/resourceGroups/$Rg/providers/Microsoft.ContainerRegistry/registries/$Registry"
 
 # Add the Search key as a Key-Vault-referenced secret + wire it as an env var
-az containerapp secret set --name $CaName --resource-group $Rg `
-  --secrets "search-key=keyvaultref:$($ids.keyVaultUri)secrets/search-admin-key,identityref:system"
-az containerapp update --name $CaName --resource-group $Rg `
-  --set-env-vars "SEARCH_API_KEY=secretref:search-key"
+az containerapp secret set --name $CaName --resource-group $Rg --secrets "search-key=keyvaultref:$($ids.keyVaultUri)secrets/search-admin-key,identityref:system"
+az containerapp update --name $CaName --resource-group $Rg --set-env-vars "SEARCH_API_KEY=secretref:search-key"
 ```
 
 **Portal equivalent:** Container Registry → + Create (Basic SKU, Admin user disabled) → Container Apps → + Create Container App Environment → + Create Container App (pointing at the ACR image, system-assigned identity, ingress enabled on port 8080) → the app's **Secrets** blade → + Add → Key Vault reference → the app's **Identity** blade confirms system-assigned is on → grant the two role assignments above via each target resource's Access control (IAM) blade.
@@ -288,4 +284,4 @@ Same as [03-deployment.md § Post-deployment checklist](./03-deployment.md#post-
 
 ---
 
-*Last updated: 2026-08-18*
+*Last updated: 2026-08-24*

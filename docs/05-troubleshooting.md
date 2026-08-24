@@ -39,17 +39,14 @@ Common failure modes and fixes for the Developer Docs MCP Knowledge Base pattern
 **Symptom: AI Search fails with `InsufficientResourcesAvailable` — "The region 'X' is currently out of the resources required to provision new services."**
 This is regional capacity exhaustion, not a quota problem, and no amount of retrying in the same region fixes it. Deploy to another region. (Observed 2026-08-20: `eastus2` — the pattern's default — was exhausted; `eastus` succeeded.) Confirm your chosen region also has quota for `text-embedding-3-large` on the **Standard** SKU (not just GlobalStandard) and your chat model:
 
-```powershell
-az cognitiveservices usage list -l <region> -o json |
-  ConvertFrom-Json |
-  Where-Object { $_.name.value -match 'text-embedding-3-large|gpt-5-mini' } |
-  ForEach-Object { "{0}  {1}/{2}" -f $_.name.value, $_.currentValue, $_.limit }
+```bash
+az cognitiveservices usage list -l <region> --query "[?contains(name.value,'text-embedding-3-large') || contains(name.value,'gpt-5')].{name:name.value, used:currentValue, limit:limit}" -o table
 ```
 
 **Symptom: corpus upload fails with `AuthorizationFailure` / "The request may be blocked by network rules of storage account", and `az keyvault secret show` returns `Forbidden: Public network access is disabled`.**
 You are in a **governed subscription** where an Azure Policy forces `publicNetworkAccess: Disabled` on Storage and Key Vault. RBAC is not the problem — check first, and note the policy will silently revert an explicit re-enable:
 
-```powershell
+```bash
 az storage account show -n <storage> -g <rg> --query publicNetworkAccess -o tsv   # Disabled
 az storage account update -n <storage> -g <rg> --public-network-access Enabled --query publicNetworkAccess -o tsv   # still Disabled -> policy modify effect
 ```
@@ -57,17 +54,14 @@ az storage account update -n <storage> -g <rg> --public-network-access Enabled -
 Key Vault is **not** a blocker: `post_deploy_search.py` falls back to `az search admin-key show` automatically. Storage **is** a blocker, because the indexer needs the blobs and you need to upload them. The working path is a **Network Security Perimeter** (NSP):
 
 1. Find the perimeter (governed subscriptions normally already have one):
-   ```powershell
+   ```bash
    az resource list --resource-type "Microsoft.Network/networkSecurityPerimeters" -o table
    ```
 2. Create a profile with two inbound rules — one for the whole subscription (this is what lets AI Search reach Storage via its managed identity) and one for your workstation's public IP — plus an outbound rule. Prefer a **dedicated profile** over editing the shared `defaultProfile`, so you don't change access for unrelated resources.
 3. Associate the storage account with that profile in `Enforced` mode.
 4. Set the storage account to perimeter mode — note the `az storage account` CLI does **not** expose this value, so it must go through REST:
-   ```powershell
-   az rest --method patch `
-     --url "https://management.azure.com/subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Storage/storageAccounts/<storage>?api-version=2023-05-01" `
-     --body '{"properties":{"publicNetworkAccess":"SecuredByPerimeter"}}' `
-     --headers "Content-Type=application/json"
+   ```bash
+   az rest --method patch --url "https://management.azure.com/subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Storage/storageAccounts/<storage>?api-version=2023-05-01" --body '{"properties":{"publicNetworkAccess":"SecuredByPerimeter"}}' --headers "Content-Type=application/json"
    ```
 5. Wait for propagation — roughly 2-5 minutes before the data plane accepts requests. Re-test with `az storage container list --account-name <storage> --auth-mode login`.
 
@@ -108,10 +102,9 @@ First check whether the source document actually has headings at that depth — 
 **Symptom: the MCP client (GitHub Copilot) gets a prose non-answer — e.g. "I cannot access external documents right now" or "No relevant content was found" — while a direct `POST /knowledgebases/{name}/retrieve` call returns good grounded passages.**
 The knowledge base's `outputMode` is `answerSynthesis`. That mode has the query-planning model write the final prose, but the **native MCP tool cannot pass `includeReferenceSourceData`** (its schema accepts only `queries`), so the synthesising model receives references with no source data and answers that it has nothing to read. Nothing is wrong with your index. Set `outputMode` to `extractiveData`, which returns the ranked passages themselves — each with `ref_id`, source document title, and heading path — and let the MCP client do its own synthesis and citation:
 
-```powershell
-$ak = az search admin-key show -g <rg> --service-name <search> --query primaryKey -o tsv
-Invoke-RestMethod -Uri "https://<search>.search.windows.net/knowledgebases/<kb>?api-version=2026-05-01-preview" `
-  -Headers @{'api-key'=$ak} | Select-Object outputMode
+```bash
+AK=$(az search admin-key show -g <rg> --service-name <search> --query primaryKey -o tsv)
+curl -s "https://<search>.search.windows.net/knowledgebases/<kb>?api-version=2026-05-01-preview" -H "api-key: $AK"
 ```
 
 `post_deploy_search.py` now defaults to `extractiveData`; override with `knowledgeBaseOutputMode` in `demo-ids.local.json` only if a non-LLM client genuinely needs prose.
@@ -127,12 +120,9 @@ Invoke-RestMethod -Uri "https://<search>.search.windows.net/knowledgebases/<kb>?
 **Symptom: `--check-mcp-endpoint` reports "Native endpoint not available", but the endpoint actually works.**
 Fixed 2026-08-20. The MCP Streamable HTTP transport replies with **Server-Sent Events** (`Content-Type: text/event-stream`) — each JSON-RPC message arrives on a `data:` line — so calling `resp.json()` on it raises `Expecting value: line 1 column 1 (char 0)` and the check falsely concluded the endpoint was missing. That in turn pushes you to deploy the optional fallback Container App for no reason. If your copy predates the fix, verify by hand:
 
-```powershell
-$key = az search admin-key show -g <rg> --service-name <search> --query primaryKey -o tsv
-$body = @{ jsonrpc='2.0'; id=1; method='tools/list' } | ConvertTo-Json
-Invoke-WebRequest -Uri "https://<search>.search.windows.net/knowledgebases/<kb>/mcp?api-version=2026-05-01-preview" `
-  -Method Post -UseBasicParsing -Body $body `
-  -Headers @{ 'api-key'=$key; 'Content-Type'='application/json'; 'Accept'='application/json, text/event-stream' }
+```bash
+AK=$(az search admin-key show -g <rg> --service-name <search> --query primaryKey -o tsv)
+curl -s -X POST "https://<search>.search.windows.net/knowledgebases/<kb>/mcp?api-version=2026-05-01-preview" -H "api-key: $AK" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 A working endpoint returns HTTP 200 with `event: message` / `data: {...}` advertising the `knowledge_base_retrieve` tool. Always send `Accept: application/json, text/event-stream`.
 
@@ -155,9 +145,8 @@ seconds.
 Confirm it is not model latency by timing a single call directly — a real register-diagram page
 through `gpt-4.1` at `detail: high` measured **6.6–7.5s**:
 
-```powershell
-az cognitiveservices account deployment show -n <foundry> -g <rg> --deployment-name vision `
-  --query "{cap:sku.capacity, limits:properties.rateLimits[].{key:key,count:count}}" -o json
+```bash
+az cognitiveservices account deployment show -n <foundry> -g <rg> --deployment-name vision --query "{cap:sku.capacity, limits:properties.rateLimits[].{key:key,count:count}}" -o json
 ```
 
 A deployment's request/minute limit **scales with capacity** (capacity 400 → 400 requests/min).
@@ -190,9 +179,13 @@ left the old parts' rows in place, so the same pages existed twice under differe
 Detect orphans by faceting on `sourceDocument` and comparing against what is actually in the
 container:
 
-```powershell
-$body = @{ search='*'; top=0; facets=@('sourceDocument,count:50') } | ConvertTo-Json
-# ...then compare with: az storage blob list --account-name <storage> --container-name raw --auth-mode login --query "[].name" -o tsv
+```bash
+# rows currently in the index, by source document
+AK=$(az search admin-key show -g <rg> --service-name <search> --query primaryKey -o tsv)
+curl -s -X POST "https://<search>.search.windows.net/indexes/idx-documents-hybrid/docs/search?api-version=2026-05-01-preview" -H "api-key: $AK" -H "Content-Type: application/json" -d '{"search":"*","top":0,"facets":["sourceDocument,count:50"]}'
+
+# ...then compare against what is actually in the container
+az storage blob list --account-name <storage> --container-name raw --auth-mode login --query "[].name" -o tsv
 ```
 
 **Symptom: `Web Api skill response is invalid` wrapping `InternalServerError: upstream connect error`.**
@@ -220,10 +213,10 @@ live: two consecutive re-upload-then-run cycles both returned `processed=0 faile
 
 Inspect the tracking state to understand what the indexer thinks it has seen:
 
-```powershell
-$ak = az search admin-key show -g <rg> --service-name <search> --query primaryKey -o tsv
-$s = Invoke-RestMethod -Uri "https://<search>.search.windows.net/indexers/ixr-hybrid-cu/status?api-version=2026-05-01-preview" -Headers @{'api-key'=$ak}
-$s.lastResult.initialTrackingState; $s.lastResult.errors | ForEach-Object { $_.key }
+```bash
+AK=$(az search admin-key show -g <rg> --service-name <search> --query primaryKey -o tsv)
+curl -s "https://<search>.search.windows.net/indexers/ixr-hybrid-cu/status?api-version=2026-05-01-preview" -H "api-key: $AK"
+# look at .lastResult.initialTrackingState and .lastResult.errors[].key
 ```
 
 If a document fails **repeatedly** across resets, it is not transient — split it smaller (see
@@ -247,10 +240,8 @@ Almost always a chunking issue — a register table or multi-step procedure spli
 **Symptom: retrieval fails with HTTP 429 — "Your requests to gpt-5-mini for chat in <region> have exceeded rate limit."**
 The chat deployment's TPM is too low. Agentic retrieval spends the chat model on query planning *and* (under `answerSynthesis`) answer generation on every call, so the pattern's original 10K TPM default returned 429 on the very first query. The default is now 150K TPM; raise an existing deployment with:
 
-```powershell
-az cognitiveservices account deployment create -n <foundry> -g <rg> `
-  --deployment-name chat --model-name gpt-5-mini --model-version 2025-08-07 `
-  --model-format OpenAI --sku-name GlobalStandard --sku-capacity 150
+```bash
+az cognitiveservices account deployment create -n <foundry> -g <rg> --deployment-name chat --model-name gpt-5-mini --model-version 2025-08-07 --model-format OpenAI --sku-name GlobalStandard --sku-capacity 150
 ```
 (There is no `az cognitiveservices account deployment update` — re-running `create` with the same deployment name updates capacity in place.)
 
@@ -267,7 +258,7 @@ Check the indexer schedule isn't re-processing the full corpus more often than n
 
 ### 8.2 Useful queries
 
-```powershell
+```bash
 # Indexer status
 python scripts/post_deploy_search.py --ids-file demo-ids.local.json --indexer-status
 
@@ -285,4 +276,4 @@ python scripts/post_deploy_search.py --ids-file demo-ids.local.json --test-retri
 
 ---
 
-*Last updated: 2026-08-20*
+*Last updated: 2026-08-24*

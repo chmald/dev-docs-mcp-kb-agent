@@ -42,13 +42,13 @@ The endpoint speaks MCP's standard lifecycle (`initialize`, `tools/list`, `tools
 2. If it receives a valid MCP `initialize` response → records `mcpEndpointAvailability: "native"` in `demo-ids.local.json`
 3. If it receives a 404, `FeatureNotEnabled`, or an unrecognized-path error → records `mcpEndpointAvailability: "wrapper-required"` and prints the custom wrapper deployment instructions
 
-```powershell
+```bash
 python post_deploy_search.py --ids-file ../demo-ids.local.json --check-mcp-endpoint
 ```
 
 If you get an ambiguous result, cross-check manually:
 
-```powershell
+```bash
 # Confirm the Knowledge Base itself exists and responds to a direct retrieve call
 python post_deploy_search.py --ids-file ../demo-ids.local.json --test-retrieve --query "test question your corpus can answer"
 ```
@@ -79,20 +79,20 @@ This gives the pattern **two levels of redundancy**: native MCP → Knowledge Ba
 
 Run it locally over stdio for single-developer testing:
 
-```powershell
+```bash
 cd scripts
 python mcp_fallback_server.py --transport stdio
 ```
 
 Or over Streamable HTTP (what Container Apps hosting uses):
 
-```powershell
+```bash
 python mcp_fallback_server.py --transport streamable-http --port 8080
 ```
 
 ## 5 — Deploying the custom wrapper server to Azure Container Apps
 
-```powershell
+```bash
 cd scripts
 ./deploy_mcp_server.ps1 -IdsFile ../demo-ids.local.json
 ```
@@ -106,11 +106,9 @@ This script:
 
 ## Verification
 
-```powershell
+```bash
 # From any machine with network access to the Container App
-curl -X POST https://<container-app-fqdn>/mcp `
-  -H "Content-Type: application/json" `
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+curl -X POST https://<container-app-fqdn>/mcp -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
 A healthy response lists your configured tool (`corpus.mcpToolName` — `retrieve_technical_docs` in the shipped example). If this fails, see [05-troubleshooting.md § 4](05-troubleshooting.md#4--mcp-endpoint-native-or-fallback).
@@ -126,4 +124,4 @@ A healthy response lists your configured tool (`corpus.mcpToolName` — `retriev
 
 ---
 
-*Last updated: 2026-08-18*
+*Last updated: 2026-08-24*

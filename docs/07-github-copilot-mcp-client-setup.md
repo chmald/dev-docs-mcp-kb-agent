@@ -164,4 +164,4 @@ Copilot recognizes the connected MCP tool as relevant to the question, calls it,
 
 ---
 
-*Last updated: 2026-08-18*
+*Last updated: 2026-08-24*

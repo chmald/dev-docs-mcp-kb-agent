@@ -1,8 +1,60 @@
 # 02 — Prerequisites
 
-Everything required before you start building. Work through this list in order; [03-deployment.md](./03-deployment.md) assumes all of it is in place.
+Everything required before you start building. Work through this list in order;
+[03-deployment.md](./03-deployment.md) assumes all of it is in place.
 
-> **Plan ahead.** Azure OpenAI model access and AI Search tier selection can involve quota requests that take time to clear — check these first.
+> **Plan ahead.** Azure OpenAI model access and AI Search tier selection can involve quota
+> requests that take time to clear — check these first.
+
+---
+
+## 0 — Tooling and shell conventions
+
+This pattern runs on **Windows, Linux, and macOS**. Nothing in it is Windows-specific:
+
+| Component | Cross-platform? | Notes |
+|---|---|---|
+| `infra/deploy.ps1` | ✅ | PowerShell 7 (`pwsh`) runs on all three platforms. Invoke it as `pwsh ./infra/deploy.ps1` everywhere — including Linux and macOS. |
+| `scripts/*.py` | ✅ | Standard library + `azure-*` / `requests` / `pypdf`. No platform-specific paths. |
+| `az` CLI | ✅ | Identical syntax on all platforms. |
+
+### Required tools
+
+| Tool | Minimum | Install |
+|---|---|---|
+| Azure CLI (`az`) | 2.60 | <https://aka.ms/installazurecli> |
+| PowerShell (`pwsh`) | 7.0 | <https://aka.ms/powershell> — needed on Linux/macOS too, for `deploy.ps1` |
+| Python | 3.11 | <https://python.org> |
+| VS Code + **GitHub Copilot Chat** (`github.copilot-chat`) | current | For the consumption step in [07](./07-github-copilot-mcp-client-setup.md) |
+
+### Create and activate the virtual environment — the one place the shells differ
+
+Every other command in these docs is **identical on all platforms**, provided you activate the
+virtual environment first. Do this once per terminal session:
+
+**PowerShell** (Windows, Linux, macOS):
+
+```powershell
+python -m venv .venv
+.venv/Scripts/Activate.ps1      # Windows
+# .venv/bin/Activate.ps1        # Linux / macOS
+pip install -r scripts/requirements.txt
+```
+
+**Bash / zsh** (Linux, macOS, WSL, Git Bash):
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r scripts/requirements.txt
+```
+
+After activation, `python` refers to the virtual environment on every platform, so the rest of
+these docs use plain `python ...` with no path prefix.
+
+> **Why `az` commands in these docs are written on one line.** Multi-line continuation differs
+> per shell — a backtick in PowerShell, a backslash in Bash. Single-line commands paste cleanly
+> into any shell, so that is the form used throughout.
 
 ---
 
@@ -15,7 +67,7 @@ Everything required before you start building. Work through this list in order; 
 
 Register (if not already):
 
-```powershell
+```bash
 az provider register --namespace Microsoft.Search
 az provider register --namespace Microsoft.CognitiveServices
 az provider register --namespace Microsoft.Storage
@@ -76,7 +128,7 @@ Regions without full-stack support (missing semantic ranker, missing the target 
 
 ### Verify before you deploy
 
-```powershell
+```bash
 # AI Search SKUs available in a region
 az search service list-skus -o table
 
@@ -85,9 +137,7 @@ az search service list-skus -o table
 # and check the service's "Semantic ranker" setting plus release notes for Knowledge Bases / MCP
 
 # Azure OpenAI model availability in a region
-az cognitiveservices account list-models `
-  --name <foundry-account-name> --resource-group <rg> `
-  --query "[?model.name=='text-embedding-3-large' || model.name=='gpt-5-mini']"
+az cognitiveservices account list-models --name <foundry-account-name> --resource-group <rg> --query "[?model.name=='text-embedding-3-large' || model.name=='gpt-5-mini']"
 
 # Document Intelligence Layout model availability is bundled with the Foundry/Cognitive
 # Services account -- check the region support table on Microsoft Learn for Document
@@ -145,4 +195,4 @@ Confirm all of these before moving to [03-deployment.md](./03-deployment.md):
 
 ---
 
-*Last updated: 2026-08-20*
+*Last updated: 2026-08-24*
