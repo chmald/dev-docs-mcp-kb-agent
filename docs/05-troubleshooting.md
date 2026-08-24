@@ -20,6 +20,8 @@ Common failure modes and fixes for the Developer Docs MCP Knowledge Base pattern
 | Citations come back with empty source data | `includeReferenceSourceData` not set, or field missing from the knowledge source's `sourceDataFields` | § 2 |
 | Knowledge Base `retrieve` call returns empty/low-quality results | Semantic ranker not enabled, or query planning model not deployed | § 3 |
 | Retrieval returns HTTP 429 `exceeded rate limit` | Chat deployment TPM too low for agentic retrieval | § 7 |
+| Vision skill fails: `did not execute within the time limit '00:00:30'` | **Request-rate throttling**, not model latency — deployment req/min ceiling below the concurrent burst | § 4 |
+| `Web Api skill response is invalid` + `upstream connect error` | Transient upstream failure in a long vision run — re-run without `--reset` | § 4 |
 | MCP client gets "I cannot access external documents" instead of passages | Knowledge base `outputMode` is `answerSynthesis`; MCP needs `extractiveData` | § 3 |
 | MCP endpoint check reports "not available" but the endpoint works | SSE response parsed as JSON — fixed 2026-08-20 | § 4 |
 | MCP endpoint check returns 404 / `FeatureNotEnabled` | Native Knowledge Base MCP surface not available on this Search tier/region/API version | § 3, § 4 |
@@ -139,8 +141,39 @@ The native tool takes `queries` — a JSON **array** of 1 string, max 400 charac
 **Symptom: native MCP endpoint check returns 404 or a feature-not-enabled error.**
 This is expected on Search services/regions where the MCP endpoint hasn't rolled out yet, or where the API version has moved on since this pattern was last verified. Proceed with the optional custom wrapper server (Phase 4) — this is exactly what it's for. Re-check availability periodically; see [docs/06](./06-mcp-endpoint-and-fallback-server.md) for the current verification command.
 
-**Symptom: fallback Container App fails to start / crash-loops.**
-Check `az containerapp logs show`. Most common causes: a Key Vault reference the Container App's managed identity can't read (missing `Key Vault Secrets User` role), or a missing environment variable for the Search endpoint/key.
+**Symptom: the vision skill fails with `Could not execute skill because it did not execute within the time limit '00:00:30'`.**
+Almost always **request-rate throttling**, not a slow model — and the error message actively
+misleads you toward the wrong fix.
+
+The `ChatCompletionSkill` timeout is fixed at 30 seconds, and `degreeOfParallelism` was removed
+from the skill schema in Search REST API `2026-04-01`, so concurrency cannot be limited from
+the AI Search side. AI Search issues figure calls concurrently; if the deployment's
+requests-per-minute ceiling is below that burst, calls queue and individual requests exceed 30
+seconds.
+
+Confirm it is not model latency by timing a single call directly — a real register-diagram page
+through `gpt-4.1` at `detail: high` measured **6.6–7.5s**:
+
+```powershell
+az cognitiveservices account deployment show -n <foundry> -g <rg> --deployment-name vision `
+  --query "{cap:sku.capacity, limits:properties.rateLimits[].{key:key,count:count}}" -o json
+```
+
+A deployment's request/minute limit **scales with capacity** (capacity 400 → 400 requests/min).
+Fixes, in order of preference:
+
+1. **Raise the deployment capacity** to give request headroom proportional to the number of
+   figures in a single document.
+2. **Split oversized documents** so each ingestion produces a smaller concurrent burst — also
+   what Content Understanding's 300-page limit requires, for an unrelated reason.
+3. Re-run without `--reset`; the indexer resumes from its checkpoint, so progress is not lost.
+
+If capacity is already at the subscription quota ceiling (`InsufficientQuota` on the raise),
+splitting is the only remaining lever.
+
+**Symptom: `Web Api skill response is invalid` wrapping `InternalServerError: upstream connect error`.**
+Transient upstream failure during a long vision-heavy run. Re-run **without** `--reset` to
+resume. Repeated occurrences on a 900-page corpus are another argument for splitting.
 
 ## 5 — GitHub Copilot / VS Code MCP client
 

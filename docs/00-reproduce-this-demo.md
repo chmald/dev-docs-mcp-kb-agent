@@ -87,9 +87,16 @@ hybrid uses (names must match `demo-ids.local.json`):
 # vision skill has a fixed 30s timeout whose failure mode is total (one slow
 # figure fails the whole document), so latency variance matters more than
 # capability. See docs/08 § Model selection.
+#
+# CAPACITY IS A RELIABILITY SETTING HERE, not a cost setting. A deployment's
+# requests-per-minute limit scales with capacity (capacity 400 -> 400 req/min),
+# AI Search fires figure calls concurrently, and `degreeOfParallelism` was
+# removed from the skill in API 2026-04-01 -- so there is no way to throttle
+# from the AI Search side. Under-provision this and ingestion fails with a
+# misleading 30s *timeout* even though each call takes ~7s.
 az cognitiveservices account deployment create -n <foundry> -g <rg> `
   --deployment-name vision --model-name gpt-4.1 --model-version 2025-04-14 `
-  --model-format OpenAI --sku-name GlobalStandard --sku-capacity 400
+  --model-format OpenAI --sku-name GlobalStandard --sku-capacity 1000
 
 # Knowledge-base query planning. Frontier -- no timeout pressure here.
 az cognitiveservices account deployment create -n <foundry> -g <rg> `
@@ -109,21 +116,41 @@ az cognitiveservices account deployment create -n <foundry> -g <rg> `
 
 ## Part B — Route and upload the corpus
 
-### B1. See the routing plan (free — no service calls)
+### B1. Split oversized documents (strongly recommended)
 
 ```powershell
 cd ../scripts
 pip install -r requirements.txt
+python hybrid_ingest.py --ids-file ../demo-ids.local.json --split --plan --source-dir "<path-to-pdfs>"
+```
+
+`--split` breaks any PDF over 300 pages into page-ranged parts
+(`manual__p0001-0300.pdf`), which fixes **two independent problems at once**:
+
+- Every part becomes eligible for the **higher-quality Content Understanding tier**, instead of
+  the whole manual falling to Document Layout because of the 300-page limit.
+- Figure verbalization fires one vision call per figure. A 900-page document produces a burst
+  large enough to exhaust the vision deployment's requests-per-minute ceiling, and long runs
+  hit transient upstream 500s — and because AI Search treats a document as one unit, a late
+  failure **discards the whole document's enrichment**. Smaller parts make failures cheap and
+  localised.
+
+Part filenames carry the source page range so citations stay traceable to the original
+document. Skip `--split` only if every document is already under 300 pages.
+
+### B2. See the routing plan (free — no service calls)
+
+```powershell
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --plan --source-dir "<path-to-pdfs>"
 ```
 
 This is also the number you need for a cost estimate — see
 [08 § Cost model](./08-extraction-tier-comparison.md#cost-model).
 
-### B2. Upload into the tier prefixes
+### B3. Upload into the tier prefixes
 
 ```powershell
-python hybrid_ingest.py --ids-file ../demo-ids.local.json --upload --source-dir "<path-to-pdfs>"
+python hybrid_ingest.py --ids-file ../demo-ids.local.json --upload --source-dir "<split-or-original-dir>"
 ```
 
 **Checkpoint:** blobs appear under `raw/cu/` and/or `raw/di/`.

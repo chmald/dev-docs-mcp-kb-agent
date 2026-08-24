@@ -170,9 +170,17 @@ If a meaningful share of the corpus exceeds 300 pages, you have three options:
 
 | Option | What it costs you | When it's right |
 |---|---|---|
-| **Split oversized PDFs** into ≤300-page parts before upload | A pre-processing step, and page numbers become part-relative unless you offset them | Best overall — keeps CU's quality on the whole corpus |
-| **Hybrid**: CU for ≤300-page docs, DI Layout for the rest | Two skillsets, two indexes, mixed citation styles in one answer | Pragmatic when only a few documents are oversized |
+| **Split oversized PDFs** into ≤300-page parts — `hybrid_ingest.py --split` | A pre-processing step; page numbers stay traceable because part filenames carry the source range | **Best overall.** Keeps CU's quality across the whole corpus *and* makes vision failures cheap — see below |
+| **Hybrid**: CU for ≤300-page docs, DI Layout for the rest | Two skillsets, two indexes, mixed citation styles in one answer | Pragmatic when only a few documents are oversized and splitting is unacceptable |
 | **Stay on DI Layout** | Split tables, empty figures, misattributing citations | Only if oversized documents dominate and splitting is unacceptable |
+
+> **Splitting fixes a second, independent problem.** Figure verbalization issues one vision
+> call per figure, so a 900-page document creates a burst large enough to exhaust the vision
+> deployment's requests-per-minute ceiling — which surfaces as a *misleading 30-second
+> timeout* — and long runs additionally hit transient upstream 500s. Because AI Search treats
+> a document as one unit, a late failure discards the entire document's enrichment. On the
+> validated corpus, splitting the 906-page specification moved **all 906 pages onto the
+> higher-quality Content Understanding tier** and eliminated the failure class entirely.
 
 ---
 
@@ -333,6 +341,31 @@ rather than choosing.
   ```
 
   `reasoning_effort: "minimal"` is rejected (HTTP 400) — `low` is the floor.
+- **Provision request-rate headroom for the vision model — this is the #1 cause of ingestion
+  failures.** The `ChatCompletionSkill` timeout is fixed at 30 seconds *and*
+  `degreeOfParallelism` was removed from the skill schema in Search REST API `2026-04-01`, so
+  **you cannot throttle concurrency from the AI Search side**. AI Search fires figure calls
+  concurrently; if the deployment's requests-per-minute ceiling is lower than that burst,
+  requests queue, individual calls blow the 30s limit, and the document fails.
+
+  The failure is misleading — it reports as a *timeout*, so it looks like the model is too
+  slow. It isn't. Measured per-call latency for `gpt-4.1` on a real register-diagram page at
+  `detail: high` was **6.6–7.5s**, comfortably inside the limit. The timeouts only appear
+  under ingestion concurrency.
+
+  An Azure OpenAI deployment's **request/minute limit scales with its capacity** — capacity
+  400 gives 400 requests/min. Size it against how many figures a single document contains,
+  not against average token throughput:
+
+  ```powershell
+  az cognitiveservices account deployment show -n <foundry> -g <rg> --deployment-name vision `
+    --query "{cap:sku.capacity, limits:properties.rateLimits[].{key:key,count:count}}" -o json
+  ```
+
+  If you cannot raise capacity far enough (subscription quota caps it), **split the document** —
+  fewer figures per document means a smaller concurrent burst. That is the same remedy as
+  Content Understanding's 300-page limit, for a completely independent reason.
+
 - **Verbalizing a large document is slow.** One vision call per extracted figure across a
   906-page specification runs for tens of minutes. Budget for it, or split the document and
   route it to Tier CU instead.

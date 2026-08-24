@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -103,6 +104,70 @@ def page_count(path: Path) -> int | None:
     except Exception as exc:
         print(f"  ! could not read {path.name}: {exc}")
         return None
+
+
+def split_oversized(source_dir: str, out_dir: str, max_pages: int = CU_MAX_PAGES) -> list[dict]:
+    """Split PDFs larger than `max_pages` into page-ranged parts.
+
+    This is the remedy for the two independent problems that oversized documents
+    cause, and it fixes both at once:
+
+      1. Content Understanding hard-rejects files over 300 pages, so an
+         unsplit reference manual can only ever use the lower-quality tier.
+      2. Figure verbalization fires one vision call per figure. A single
+         900-page document produces a burst large enough to exhaust the
+         deployment's requests-per-minute ceiling (surfacing as a misleading
+         30s *timeout*), and long runs additionally hit transient upstream
+         500s. Because AI Search treats a document as one unit, a late failure
+         discards the whole document's enrichment.
+
+    Splitting makes every part eligible for the better tier AND makes any
+    failure cheap and localised instead of catastrophic.
+
+    Part filenames carry their source page range -- `manual__p001-300.pdf` --
+    so a citation remains traceable to a page in the ORIGINAL document. Without
+    that, page numbers silently become part-relative and every citation is
+    quietly wrong by an offset.
+    """
+    from pypdf import PdfReader, PdfWriter
+
+    src = Path(source_dir)
+    dst = Path(out_dir)
+    dst.mkdir(parents=True, exist_ok=True)
+    produced: list[dict] = []
+
+    for pdf in sorted(src.glob("*.pdf")):
+        pages = page_count(pdf)
+        if pages is None:
+            print(f"  ! skipping {pdf.name} (page count unavailable)")
+            continue
+        if pages <= max_pages:
+            target = dst / pdf.name
+            if target.resolve() != pdf.resolve():
+                shutil.copy2(pdf, target)
+            produced.append({"file": target.name, "path": str(target), "pages": pages, "split": False})
+            print(f"  {pdf.name}: {pages} pages -- no split needed")
+            continue
+
+        reader = PdfReader(str(pdf))
+        parts = (pages + max_pages - 1) // max_pages
+        print(f"  {pdf.name}: {pages} pages -> {parts} parts of <= {max_pages}")
+        stem = pdf.stem
+        for i in range(parts):
+            first = i * max_pages
+            last = min(first + max_pages, pages)
+            writer = PdfWriter()
+            for p in range(first, last):
+                writer.add_page(reader.pages[p])
+            # 1-based, inclusive -- matches how a human cites a page.
+            name = f"{stem}__p{first + 1:04d}-{last:04d}.pdf"
+            target = dst / name
+            with open(target, "wb") as fh:
+                writer.write(fh)
+            produced.append({"file": name, "path": str(target), "pages": last - first, "split": True})
+            print(f"    wrote {name} ({last - first} pages)")
+
+    return produced
 
 
 def plan(source_dir: str) -> list[dict]:
@@ -694,6 +759,14 @@ def main() -> None:
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--ids-file", required=True)
     p.add_argument("--source-dir")
+    p.add_argument("--split", action="store_true",
+                   help="Split PDFs over the 300-page limit into page-ranged parts before "
+                        "planning/uploading. Writes to --split-dir. Strongly recommended for "
+                        "reference manuals: it makes every part eligible for the higher-quality "
+                        "Content Understanding tier AND makes vision failures cheap instead of "
+                        "discarding a whole document's enrichment.")
+    p.add_argument("--split-dir", default=None,
+                   help="Destination for split output (default: <source-dir>/../corpus-split)")
     p.add_argument("--plan", action="store_true", help="Show the routing decision (no Azure calls, no cost)")
     p.add_argument("--upload", action="store_true", help="Upload documents into their tier's blob prefix")
     p.add_argument("--build", action="store_true", help="Create the unified index, both tiers, and the knowledge base")
@@ -703,10 +776,17 @@ def main() -> None:
 
     ids = pds.load_ids(args.ids_file)
 
-    if args.plan or args.upload:
+    if args.plan or args.upload or args.split:
         if not args.source_dir:
-            p.error("--plan/--upload require --source-dir")
-        rows = plan(args.source_dir)
+            p.error("--plan/--upload/--split require --source-dir")
+        source = args.source_dir
+        if args.split:
+            split_dir = args.split_dir or str(Path(args.source_dir).parent / "corpus-split")
+            print(f"Splitting oversized documents into {split_dir} ...")
+            split_oversized(args.source_dir, split_dir)
+            source = split_dir
+            print()
+        rows = plan(source)
         print_plan(rows)
         if args.upload:
             print()

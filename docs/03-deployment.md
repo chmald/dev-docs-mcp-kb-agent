@@ -107,9 +107,16 @@ deployments — names must match `demo-ids.local.json` (`frontierDeployment`,
 # vision skill has a fixed 30s timeout whose failure mode is total (one slow
 # figure fails the whole document), so latency variance matters more than
 # capability. See docs/08 § Model selection.
+#
+# CAPACITY IS A RELIABILITY SETTING HERE, not a cost setting. A deployment's
+# requests-per-minute limit scales with capacity (capacity 400 -> 400 req/min),
+# AI Search fires figure calls concurrently, and `degreeOfParallelism` was
+# removed from the skill in API 2026-04-01 -- so there is no way to throttle
+# from the AI Search side. Under-provision this and ingestion fails with a
+# misleading 30s *timeout* even though each call takes ~7s.
 az cognitiveservices account deployment create -n <foundry> -g <rg> `
   --deployment-name vision --model-name gpt-4.1 --model-version 2025-04-14 `
-  --model-format OpenAI --sku-name GlobalStandard --sku-capacity 400
+  --model-format OpenAI --sku-name GlobalStandard --sku-capacity 1000
 
 # Knowledge-base query planning. Frontier -- no timeout pressure here.
 az cognitiveservices account deployment create -n <foundry> -g <rg> `
