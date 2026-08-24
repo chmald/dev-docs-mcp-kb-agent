@@ -104,9 +104,34 @@ if ($WhatIf) {
 }
 
 Write-Host "Deploying main.bicep to $ResourceGroup..." -ForegroundColor Cyan
-$deploymentJson = az @deployArgs -o json
-if ($LASTEXITCODE -ne 0) {
+
+# Tearing down a resource group leaves background deletes running. Redeploying
+# with the same names can then transiently fail on:
+#   ServiceDeleting        - AI Search name still held by an in-flight delete
+#   FlagMustBeSetForRestore - Cognitive Services purge not yet propagated
+# Neither is a template problem and both clear on their own, so retry with
+# backoff rather than making the operator re-run manually.
+$maxAttempts = 5
+$attempt = 0
+while ($true) {
+    $attempt++
+    $deploymentJson = az @deployArgs -o json
+    if ($LASTEXITCODE -eq 0) { break }
+
+    $transient = $deploymentJson -match 'ServiceDeleting|FlagMustBeSetForRestore|another operation is in progress'
+    if ($transient -and $attempt -lt $maxAttempts) {
+        $wait = 60 * $attempt
+        Write-Host "Transient teardown conflict (attempt $attempt/$maxAttempts) - a previous delete is still finishing." -ForegroundColor Yellow
+        Write-Host "Retrying in $wait seconds..." -ForegroundColor Yellow
+        Start-Sleep -Seconds $wait
+        continue
+    }
+
     Write-Host "`nDeployment FAILED (az exit code $LASTEXITCODE). No IDs were written." -ForegroundColor Red
+    if ($transient) {
+        Write-Host "Still blocked by an in-flight delete after $maxAttempts attempts." -ForegroundColor Red
+        Write-Host "Wait a few more minutes and re-run, or deploy with a different -Environment/-Region token." -ForegroundColor Red
+    }
     Write-Host "Inspect the failed operations with:" -ForegroundColor Red
     Write-Host "  az deployment operation group list --resource-group $ResourceGroup --name main -o table" -ForegroundColor Red
     exit 1
@@ -174,12 +199,15 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "`nDeployment complete. Next:" -ForegroundColor Cyan
-Write-Host "  1. Deploy the frontier models used by the hybrid ingestion path:" -ForegroundColor Cyan
+Write-Host "  1. Deploy the two model deployments the hybrid ingestion path needs:" -ForegroundColor Cyan
+Write-Host "     # Figure verbalization (both tiers) -- NON-reasoning model on purpose:" -ForegroundColor Cyan
+Write-Host "     # the vision skill has a fixed 30s timeout whose failure mode is total." -ForegroundColor Cyan
+Write-Host "     az cognitiveservices account deployment create -n $($summary.foundryResource) -g $ResourceGroup ``" -ForegroundColor Cyan
+Write-Host "       --deployment-name vision --model-name gpt-4.1 --model-version 2025-04-14 ``" -ForegroundColor Cyan
+Write-Host "       --model-format OpenAI --sku-name GlobalStandard --sku-capacity 400" -ForegroundColor Cyan
+Write-Host "     # Knowledge-base query planning -- frontier, no timeout pressure:" -ForegroundColor Cyan
 Write-Host "     az cognitiveservices account deployment create -n $($summary.foundryResource) -g $ResourceGroup ``" -ForegroundColor Cyan
 Write-Host "       --deployment-name sol --model-name gpt-5.6-sol --model-version 2026-07-09 ``" -ForegroundColor Cyan
-Write-Host "       --model-format OpenAI --sku-name GlobalStandard --sku-capacity 200" -ForegroundColor Cyan
-Write-Host "     az cognitiveservices account deployment create -n $($summary.foundryResource) -g $ResourceGroup ``" -ForegroundColor Cyan
-Write-Host "       --deployment-name cu-frontier --model-name gpt-5.5 --model-version 2026-04-24 ``" -ForegroundColor Cyan
 Write-Host "       --model-format OpenAI --sku-name GlobalStandard --sku-capacity 200" -ForegroundColor Cyan
 Write-Host "  2. cd ../scripts && pip install -r requirements.txt" -ForegroundColor Cyan
 Write-Host "  3. python hybrid_ingest.py --ids-file $idsLocalPath --plan   --source-dir <your-pdfs>" -ForegroundColor Cyan

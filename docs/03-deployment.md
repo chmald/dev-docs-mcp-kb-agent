@@ -103,8 +103,15 @@ deployments — names must match `demo-ids.local.json` (`frontierDeployment`,
 `cuModelDeployment`):
 
 ```powershell
-# One frontier deployment covers figure verbalization (both tiers) AND
-# knowledge-base query planning.
+# Figure verbalization, BOTH tiers. Deliberately a NON-reasoning model: the
+# vision skill has a fixed 30s timeout whose failure mode is total (one slow
+# figure fails the whole document), so latency variance matters more than
+# capability. See docs/08 § Model selection.
+az cognitiveservices account deployment create -n <foundry> -g <rg> `
+  --deployment-name vision --model-name gpt-4.1 --model-version 2025-04-14 `
+  --model-format OpenAI --sku-name GlobalStandard --sku-capacity 400
+
+# Knowledge-base query planning. Frontier -- no timeout pressure here.
 az cognitiveservices account deployment create -n <foundry> -g <rg> `
   --deployment-name sol --model-name gpt-5.6-sol --model-version 2026-07-09 `
   --model-format OpenAI --sku-name GlobalStandard --sku-capacity 200
