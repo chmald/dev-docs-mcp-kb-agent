@@ -30,7 +30,7 @@ VS Code discovers MCP servers from a workspace-level `.vscode/mcp.json` (shared 
   "servers": {
     "dev-docs-knowledge-agent": {
       "type": "http",
-      "url": "https://${input:searchServiceName}.search.windows.net/knowledgebases/kb-documents/mcp?api-version=2026-05-01-preview",
+      "url": "https://${input:searchServiceName}.search.windows.net/knowledgebases/kb-hybrid/mcp?api-version=2026-05-01-preview",
       "headers": {
         "api-key": "${input:searchApiKey}"
       }
@@ -62,7 +62,7 @@ VS Code discovers MCP servers from a workspace-level `.vscode/mcp.json` (shared 
   "servers": {
     "dev-docs-knowledge-agent": {
       "type": "http",
-      "url": "https://${input:searchServiceName}.search.windows.net/knowledgebases/kb-documents/mcp?api-version=2026-05-01-preview",
+      "url": "https://${input:searchServiceName}.search.windows.net/knowledgebases/kb-hybrid/mcp?api-version=2026-05-01-preview",
       "headers": {
         "Authorization": "Bearer ${input:searchBearerToken}"
       }

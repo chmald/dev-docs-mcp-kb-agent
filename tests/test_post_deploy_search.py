@@ -350,3 +350,128 @@ def test_pipeline_retargets_to_a_different_corpus(mock_request):
     combined = json.dumps([index_body, skillset_body, source_body, kb_body]).lower()
     assert "dev-docs" not in combined
     assert "datasheet" not in combined
+
+
+# ---------------------------------------------------------------------------
+# Regression guards -- one per defect class found during the 2026-08-20 live
+# dogfood run (first real deployment of this pattern). Each of these was a
+# hard failure that blocked the build; assert the contract, not a snapshot.
+# ---------------------------------------------------------------------------
+
+
+def test_ai_services_subdomain_uses_foundry_form_without_trailing_slash():
+    """DEFECT: the skillset's AIServicesByIdentity binding was fed the
+    Document Intelligence endpoint (`<name>.cognitiveservices.azure.com/`),
+    which the Search API rejects with "'SubdomainUrl' parameter is not
+    well-formed". A `kind: AIServices` account must be referenced by its AI
+    Foundry subdomain, and a trailing slash is rejected."""
+    ids = dict(SAMPLE_IDS, foundryResource="aif-ddmcp-dev-eastus2")
+    url = pds._ai_services_subdomain_url(ids)
+    assert url == "https://aif-ddmcp-dev-eastus2.services.ai.azure.com"
+    assert not url.endswith("/")
+    assert "cognitiveservices.azure.com" not in url
+
+
+def test_ai_services_subdomain_honours_explicit_override_and_strips_slash():
+    ids = dict(SAMPLE_IDS, aiServicesSubdomainUrl="https://custom.services.ai.azure.com/")
+    assert pds._ai_services_subdomain_url(ids) == "https://custom.services.ai.azure.com"
+
+
+def test_parse_mcp_response_reads_server_sent_events():
+    """DEFECT: the native MCP endpoint check called resp.json() on a
+    Streamable-HTTP (SSE) response, raising "Expecting value: line 1 column 1"
+    and reporting a WORKING native endpoint as unavailable -- which pushes
+    users to deploy the fallback Container App for no reason."""
+    resp = MagicMock()
+    resp.headers = {"Content-Type": "text/event-stream"}
+    resp.text = 'event: message\ndata: {"result":{"tools":[{"name":"knowledge_base_retrieve"}]}}\n\n'
+    payload = pds._parse_mcp_response(resp)
+    assert payload is not None
+    assert payload["result"]["tools"][0]["name"] == "knowledge_base_retrieve"
+
+
+def test_parse_mcp_response_still_handles_plain_json():
+    resp = MagicMock()
+    resp.headers = {"Content-Type": "application/json"}
+    resp.json.return_value = {"result": {"ok": True}}
+    assert pds._parse_mcp_response(resp) == {"result": {"ok": True}}
+
+
+def test_az_executable_is_resolved_via_which():
+    """DEFECT: subprocess.run(["az", ...]) raises FileNotFoundError on Windows,
+    where the CLI is `az.cmd`. Resolve through shutil.which so PATHEXT applies."""
+    with patch("post_deploy_search.shutil.which", return_value=r"C:\fake\az.cmd") as which:
+        assert pds._az_executable() == r"C:\fake\az.cmd"
+        which.assert_called_once_with("az")
+
+
+def test_get_admin_key_falls_back_to_search_control_plane():
+    """DEFECT: get_admin_key hard-depended on Key Vault data-plane reach. In
+    governed subscriptions policy forces publicNetworkAccess=Disabled on the
+    vault, so the lookup fails even with correct RBAC. Fall back to the Search
+    control plane rather than failing the whole build."""
+    kv_fail = MagicMock(returncode=1, stdout="", stderr="Forbidden: public network access is disabled")
+    kv_ok = MagicMock(returncode=0, stdout="key-from-search\n", stderr="")
+    with patch("post_deploy_search.shutil.which", return_value="az"), \
+         patch("post_deploy_search.subprocess.run", side_effect=[kv_fail, kv_ok]) as run:
+        assert pds.get_admin_key(dict(SAMPLE_IDS, keyVault="kv-x", searchService="srch-x")) == "key-from-search"
+        assert run.call_count == 2
+        assert "search" in run.call_args_list[1][0][0]
+
+
+def test_get_admin_key_skips_key_vault_when_not_configured():
+    """No `keyVault` in the ids file must fall straight through to the control
+    plane rather than raising KeyError."""
+    kv_ok = MagicMock(returncode=0, stdout="key-from-search\n", stderr="")
+    ids = {k: v for k, v in SAMPLE_IDS.items() if k != "keyVault"}
+    ids["searchService"] = "srch-x"
+    with patch("post_deploy_search.shutil.which", return_value="az"), \
+         patch("post_deploy_search.subprocess.run", side_effect=[kv_ok]) as run:
+        assert pds.get_admin_key(ids) == "key-from-search"
+        assert run.call_count == 1
+
+
+def test_get_admin_key_prefers_key_vault_when_reachable():
+    kv_ok = MagicMock(returncode=0, stdout="key-from-vault\n", stderr="")
+    with patch("post_deploy_search.shutil.which", return_value="az"), \
+         patch("post_deploy_search.subprocess.run", side_effect=[kv_ok]) as run:
+        assert pds.get_admin_key(dict(SAMPLE_IDS, keyVault="kv-x")) == "key-from-vault"
+        assert run.call_count == 1
+
+
+def test_raise_with_detail_does_not_recurse():
+    """DEFECT: the error-detail helper called itself instead of
+    resp.raise_for_status(), blowing the stack with RecursionError and hiding
+    the real 400."""
+    resp = MagicMock()
+    resp.status_code = 400
+    resp.reason = "Bad Request"
+    resp.text = '{"error":{"message":"boom"}}'
+    resp.raise_for_status.side_effect = RuntimeError("raised")
+    try:
+        pds.raise_with_detail(resp)
+    except RuntimeError as exc:
+        assert str(exc) == "raised"
+    resp.raise_for_status.assert_called_once()
+
+
+@patch("post_deploy_search.search_request")
+def test_knowledge_base_defaults_to_extractive_output(mock_request):
+    """DEFECT: the knowledge base shipped with outputMode=answerSynthesis. The
+    native MCP tool only accepts a `queries` array, so it cannot request
+    reference source data -- under answerSynthesis the Copilot/MCP path gets a
+    synthesised non-answer ("I cannot access external documents") instead of
+    grounded passages. extractiveData returns ranked passages with ref_id +
+    source document + heading path, which is what an MCP client needs."""
+    mock_request.return_value = MagicMock(status_code=201)
+    pds.create_knowledge_base(SAMPLE_IDS, FAKE_ADMIN_KEY)
+    _m, _p, _i, _k, body = mock_request.call_args[0]
+    assert body["outputMode"] == "extractiveData"
+
+
+@patch("post_deploy_search.search_request")
+def test_knowledge_base_output_mode_is_overridable(mock_request):
+    mock_request.return_value = MagicMock(status_code=201)
+    pds.create_knowledge_base(dict(SAMPLE_IDS, knowledgeBaseOutputMode="answerSynthesis"), FAKE_ADMIN_KEY)
+    _m, _p, _i, _k, body = mock_request.call_args[0]
+    assert body["outputMode"] == "answerSynthesis"

@@ -4,6 +4,308 @@ Change history for this pattern. Entries are listed newest-first.
 
 ---
 
+## 2026-08-21
+
+### Docs realigned to the hybrid, cost model added, and a clean-room rebuild (v1.0.8)
+
+Two pieces of work: bringing every document in line with what actually deploys, then **deleting
+the whole environment and rebuilding from those documents** to prove the flow works from zero.
+The rebuild found nine friction points, three of them real bugs.
+
+**Documentation.** `01-architecture` and `00-reproduce` rewritten around the hybrid router;
+`03-deployment` Phase 2 replaced with hybrid ingestion; `04-testing` rewritten to add
+**chunk-quality** and **tier-provenance** categories (a golden set that only checks *which
+document* came back cannot detect a degraded passage — that is how the original build passed
+4/4 while silently discarding every figure); `03b-manual` gained the Foundry project step;
+retired resource names swept out of 02/05/06/07. Added
+[`scripts/check_doc_links.py`](scripts/check_doc_links.py), which caught 8 genuinely broken
+cross-references the restructure introduced.
+
+**`docs/08` is now the "why both services" doc**, with a three-way comparison on the validated
+corpus (2 documents, 1,025 pages):
+
+| | DI Layout only | CU only | Hybrid |
+|---|---|---|---|
+| Pages ingested | 1,025 (100%) | **119 (11.6%)** | **1,025 (100%)** |
+| Figures usable | **0** | native | **334 rows** |
+| One-time cost | ≈$10.36 | ≈$0.73 | ≈$16–19 |
+
+**The hybrid is not a cost play** — on this corpus it costs *more* than DI-only, because 88% of
+pages sit in one 906-page document that must route to Document Intelligence anyway. It is the
+only configuration that produces a **complete, usable** corpus. Stated plainly so nobody
+positions it wrongly.
+
+**Cost model added** with verified list prices and per-line sources, plus two caveats that
+materially change a quote: the Content Understanding meter is selected by **file type, not
+analyzer** (digital $0.01/1,000 pages vs image-based $5.00/1,000 — a 500× spread), and figure
+verbalization bills on **two** meters. The vision-token line is published explicitly as an
+*estimate*, because Microsoft currently documents no image-to-token formula for the GPT-5
+family.
+
+**Clean-room rebuild findings:**
+
+| # | Finding | Resolution |
+|---|---|---|
+| 1 | `pypdf` missing from `requirements.txt` | Added |
+| 2 | Cognitive Services **soft-delete** blocks redeploy (`FlagMustBeSetForRestore`) | `deploy.ps1` detects it and offers to purge |
+| 3-4 | **`allowProjectManagement` was silently stripped** from the compiled template on `accounts@2024-10-01`. The `BCP037` warning was correct and had been wrongly suppressed; the previous build only worked because the project had been created by hand in the portal | Bumped to `accounts@2025-06-01`; verified the property survives compilation and the project is created automatically |
+| 5 | `deploy.ps1` next-steps pointed at the retired ingestion script | Now prints the hybrid flow |
+| 6 | Storage network denial surfaced as a raw stack trace | Actionable message referencing the troubleshooting section |
+| 7 | A brand-new model deployment fails three different-looking ways while the control plane reports `Succeeded` | Documented as one root cause with a verification step |
+| 8 | **Content Understanding's figure descriptions failed consistently** (`FigureUnderstandingSkipped`) across both a reasoning and a non-reasoning model, with both deployments verified serving. In the *earlier* build the same condition degraded to a silent warning — the tier reported success while producing **zero** figure descriptions | Dropped CU's preview figure feature entirely |
+| 9 | **Figures now use the GA `ChatCompletionSkill` on _both_ tiers** | One figure mechanism instead of two, GA instead of preview; CU-tier figure rows went **0 → 78**. Also removes CU's model allowlist as a design constraint and drops the second frontier deployment |
+
+**Model selection corrected — the earlier guidance in this changelog was wrong.** The
+`ChatCompletionSkill` 30-second timeout has a **total-failure** mode: one slow figure failed an
+entire 906-page document, producing zero rows. `gpt-5.6-sol` benchmarked *faster* than
+`gpt-4.1-mini` on a single page (10.7s vs 17.2s) — but a one-page benchmark measures the mean,
+while a hard ceiling punishes the tail. The vision skill now runs the **non-reasoning
+`gpt-4.1`**; frontier `gpt-5.6-sol` stays on knowledge-base query planning, where there is no
+timeout pressure. Generalisable lesson: **when a service imposes a hard per-call timeout with a
+total-failure mode, select on latency _variance_, not mean latency.**
+
+**Also found:** vision-heavy ingestion of very large documents is *fragile*, not merely slow —
+hundreds of sequential vision calls hit transient upstream 500s, and because AI Search treats a
+document as one unit a late failure can cost the whole document's enrichment. Re-running
+without `--reset` resumes from the checkpoint. This is a second, independent reason to split
+oversized PDFs beyond Content Understanding's 300-page limit.
+
+**Verified on the rebuilt environment:** Bicep deploys Storage, Key Vault, Foundry **+ project**,
+and AI Search; both tiers ingest; the native MCP endpoint answers with references spanning both
+documents. Model deployments reduced to four: `embedding`, `chat`, `sol`, `vision`.
+
+---
+
+## 2026-08-20 (hybrid)
+
+### Hybrid extraction routing — use both tiers where each excels (v1.0.7)
+
+Added [`scripts/hybrid_ingest.py`](scripts/hybrid_ingest.py) and a
+[Don't choose — route](docs/08-extraction-tier-comparison.md#dont-choose--route-the-hybrid-tier)
+section to `docs/08`. Rather than picking a single extraction tier, the pattern now routes
+**per document** and lands both tiers in **one unified index behind one knowledge base**, so
+the MCP client sees a single consistent corpus.
+
+```
+page count  ──  ≤300 pages ──►  Tier CU   Content Understanding, semantic chunking
+   (free)   └─  >300 pages ──►  Tier DI+  Document Layout + Split + GenAI Prompt
+                                          image verbalization
+```
+
+**The routing is deliberately inverted relative to the sibling
+`document-intelligence-vs-content-understanding` demo.** There, Document Intelligence is the
+cheap/fast tier 1 and Content Understanding is the expensive escalation, triggered by a
+per-field confidence score. Here Content Understanding is **both cheaper and better**, so
+Document Intelligence is not tier 1 — it is the *capability fallback* for documents Content
+Understanding structurally cannot accept. The trigger is a hard input constraint (page count)
+known **before** any spend, not a confidence signal discovered after it, so no document is
+ever processed twice.
+
+**Each tier covers the other's gap:**
+
+| Weakness | Covered by |
+|---|---|
+| CU rejects files > 300 pages | Tier DI+ has no page ceiling |
+| DI Layout discards figures (empty `<figure></figure>`) | Tier DI+ adds a GenAI Prompt vision skill that verbalizes figures into their own searchable rows |
+| DI Layout's heading path misattributes ~21.7% | Unified index stores `sectionLabel` = **deepest heading only, never a path** |
+| CU emits no heading path | CU rows cite by page range (`locationMetadata` is text-mode only, so DI+ rows cannot) |
+
+**Free citation fix.** Verified against chunk content that the Document Layout heading defect
+is *not* a wrong heading — a chunk labelled `H2='5.7.1 tselect' → H3='5.7.2 tdata1'` genuinely
+is the `tdata1` section. The **deepest** heading is correct; only the implied ancestry is
+fabricated. Storing the deepest heading and never rendering a path removes the misattribution
+at zero cost.
+
+Every row carries `extractionTier` and `contentKind` provenance, so tier quality can be
+audited after the fact and image-description rows distinguished from text chunks.
+
+**New constraints found live while building this** (all fixed in the script, all easy to
+misdiagnose):
+
+| Constraint | Symptom if you get it wrong |
+|---|---|
+| Two index projection selectors into one index need **different** `parentKeyFieldName`s | Skillset rejected outright |
+| Index projection `mappings` do **not** accept `='literal'` expressions (that syntax is skill *inputs* only) | Whole run fails: `Parsing failure: unexpected '='`. Use a `ConditionalSkill` to materialise constants |
+| The vision skill's `api-version` query parameter is **mandatory** (the Microsoft sample omits it) | 404, surfaced as the generic *"Web Api skill response is invalid"* |
+| `extractionOptions: ["locationMetadata"]` is **rejected** with `outputFormat: "markdown"` | Skillset rejected — location metadata is text-mode only |
+| ChatCompletionSkill timeout is **fixed at 30s** and no longer configurable (`timeout` removed in Search REST API `2026-04-01`) | Looks like "reasoning models are too slow" — but the real trap is the **token budget**. Reasoning tokens are charged against the completion budget, so at the default the model spends it all reasoning and returns **empty content with no error**. Give headroom + low effort and a frontier model fits comfortably — see the benchmark below |
+
+**Also worth budgeting for:** verbalizing every figure across a 906-page specification runs
+for tens of minutes — one vision call per figure. Splitting the document and routing it to
+Tier CU is usually the better trade.
+
+**Frontier model benchmark (corrects an earlier conclusion in this entry's first revision).**
+The image-verbalization skill is where diagram comprehension actually happens, so it is the
+wrong place to economise. Measured on a real register-diagram page from the corpus:
+
+| Deployment | maxTokens | reasoning_effort | Latency | Output |
+|---|---|---|---|---|
+| `gpt-5.6-sol` (frontier) | 800 | default | 11.3s | **0 chars — silent failure** |
+| `gpt-5.6-sol` (frontier) | 4000 | default | 14.3s | 1,005 chars |
+| **`gpt-5.6-sol` (frontier)** | **4000** | **low** | **10.7s** | **785 chars** ✅ |
+| `gpt-5.4` | 4000 | low | 14.4s | 1,089 chars |
+| `gpt-4.1-mini` | 800 | n/a | 17.2s | 1,296 chars |
+
+The frontier model at low effort is **faster than the small model**, so the pattern now
+defaults to `gpt-5.6-sol` with `commonModelParameters.maxTokens: 4000` and
+`extraParameters.reasoning_effort: "low"` (both confirmed supported on
+`ChatCompletionSkill`; `reasoning_effort: "minimal"` is rejected with HTTP 400). The earlier
+"use a fast non-reasoning model" guidance was wrong about the cause — it was never latency,
+it was an exhausted completion budget returning empty content silently.
+
+**Frontier models across all three call sites (2026-08-21).** The pattern runs models in three
+places with **three different ceilings**, so "are we on frontier?" is three questions:
+
+| Component | Model | Constraint |
+|---|---|---|
+| DI+ image verbalizer (`ChatCompletionSkill`) | **`gpt-5.6-sol`** | no allowlist — current frontier |
+| CU figure descriptions (`ContentUnderstandingSkill`) | **`gpt-5.5`** | CU enforces its **own allowlist that lags the Foundry catalog** |
+| Knowledge-base query planning | **`gpt-5.6-sol`** | runs on every MCP call |
+
+Content Understanding rejects newer models outright and enumerates the current ceiling in the
+error, which is the fastest way to discover it. Upgrading the verbalizer from `gpt-4.1-mini`
+to `gpt-5.6-sol` took image-description rows **167 → 334** on the same document, zero empty,
+190 capturing explicit bit/field/register structure and 20 capturing RISC-V `WARL`/`WLRL`
+semantics.
+
+Two further corrections:
+- **`commonModelParameters.maxTokens` is unusable with reasoning models** — it serializes to
+  the legacy `max_tokens`, which every GPT-5-family model rejects (*"Use
+  'max_completion_tokens' instead"*). Pass budget and effort through `extraParameters`, which
+  forwards keys verbatim: `{ "max_completion_tokens": 4000, "reasoning_effort": "low" }`.
+- **A brand-new model deployment isn't immediately resolvable.** Content Understanding
+  returned `DeploymentIdNotFound` for a deployment already reported `Succeeded` by the control
+  plane. Wait a few minutes and re-run.
+
+**Final state.** The baseline and `-cu` comparison pipelines are torn down;
+`idx-documents-hybrid` + `kb-hybrid` is the single surviving pipeline (**4,109 rows** — 3,882
+Tier DI+, 227 Tier CU, of which **334 image-description**). `.vscode/mcp.json` repointed at
+`kb-hybrid` and verified over the native MCP endpoint with a query key: one question now
+returns evidence from **both** tiers at once.
+
+**Verified end to end.** The full corpus now sits in one index: **2,953 rows** — 2,721 from
+Tier DI+ (`riscv-spec.pdf`, 906 pages, which Tier CU cannot ingest at all) and 232 from Tier
+CU, including **167 `image-description` rows** recovered from figures plain Document Layout
+discards. Tier DI+ ran ~45 minutes with zero failures. Asking *"What is the bit width of the
+mtime register and which bits does it span?"* — answerable only from a figure, in a document
+CU rejected — returns the verbalized bit-field diagram (*"64-bit wide register labeled mtime
+spanning bits 63 to 0"*) alongside the prose section `3.2.1. Machine Timer (mtime and
+mtimecmp) Registers`. **Neither tier alone can answer it.**
+
+---
+
+## 2026-08-20 (later)
+
+### Extraction-tier A/B: Content Understanding vs. Document Intelligence Layout (v1.0.6)
+
+Added [`scripts/compare_extraction_tiers.py`](scripts/compare_extraction_tiers.py) and
+[`docs/08-extraction-tier-comparison.md`](docs/08-extraction-tier-comparison.md) — a harness that stands a
+**Content Understanding** ingestion tier up beside the existing Document Layout + Split tier
+on the same Search service (every object suffixed `-cu`), ingests the same blobs, and scores
+both. Prompted by an audit of the live index that found the baseline's extraction quality was
+materially worse than the successful golden-set run implied.
+
+**Baseline defects found by auditing the deployed index** (RISC-V corpus, 1,449 chunks):
+
+| Defect | Measurement |
+|---|---|
+| Tables split across chunk boundaries | 27% of table-bearing chunks |
+| Figures extracted as empty `<figure></figure>` | 36% of figure-bearing chunks |
+| Heading path asserts the **wrong parent** | 41% of determinable H2→H3 pairs |
+| h4+ headings never captured as citation metadata | 14.6% of chunks (`markdownHeaderDepth: h3`) |
+| Chunk size variance | 10 to 8,013 chars; 193 under 300, 47 over 6,000 |
+
+The heading defect is the serious one: the Document Layout skill's `sections` dictionary holds
+*the most recently seen heading at each level*, not a validated ancestor chain, so it will
+confidently cite a **sibling** section as the parent. Microsoft does not document it as an
+ancestor path — do not treat it as one.
+
+**Measured result on the document both tiers ingested** (RISC-V debug specification):
+
+| Metric | DI Layout + Split | Content Understanding |
+|---|---|---|
+| Tables intact | 76.7% (56/73) | **100%** (132/132) |
+| Chunks carrying an image description | 0 | **21 (8.9%)** |
+| Empty `<figure>` tags | 19 of 44 | n/a — none emitted |
+| Citation misattribution | 21.7% wrong parent | structurally impossible (page range) |
+| Chunk chars (avg / min / max) | 2077 / 34 / 6116 | 1338 / **204** / **2317** |
+| Retrieval golden set | 2/2 | 2/2 |
+| List price / 1,000 pages | $10.00 | **$5.00** |
+
+Content Understanding wins every quality axis at half the list price. Notably it **verbalizes
+register bit-field diagrams** — it recovered `sbversion` / `sbbusyerror` / `sbbusy` /
+`sbreadonaddr` / `sbaccess` / `sbautoincrement` with bit widths from the `sbcs` register image
+the baseline discarded. Microsoft documents generic figure description and makes **no** claim
+about bit-field diagrams specifically, so this is an observed result on a real corpus, not a
+guarantee — and coverage was only 8.9% of chunks, so it is a substantial improvement over
+zero rather than full diagram coverage.
+
+**The finding that outranks the scorecard: Content Understanding enforces a 300-page-per-file
+limit.** It rejected the 906-page RISC-V ISA specification outright
+(`InputPageCountExceeded`), which Document Layout ingested without complaint. For
+hardware/firmware corpora — where 500–1,500 page reference manuals are normal — this is a
+gating constraint, not a footnote. `docs/08` documents the split / hybrid / stay-put options.
+
+**Also fixed in this entry:**
+- **`allowProjectManagement: true` + a Foundry project are now created by Bicep.** The first
+  live deployment required creating a project by hand in the portal before the Search service
+  would work against the knowledge base; the template never created one.
+- Harness methodology guards, each of which was a real bug that produced plausible-but-wrong
+  numbers: audit scoped to documents **both** tiers ingested (otherwise a rejected document
+  confounds every metric); golden questions filtered to shared sources; response parsing that
+  handles **both** knowledge-base shapes (`/retrieve` prose + `references` array **and** the
+  extractiveData JSON array); per-tier knowledge-source routing (pointing a knowledge base at
+  a source it doesn't own returns HTTP 200 with no results, which reads as a retrieval
+  failure); and table-split detection that counts orphaned table *tails* — chunks holding
+  closing markup with no `<table>` opener, which is precisely the chunk that lost its header
+  row and which the first version of the metric missed entirely.
+- **`modelName` must name the model actually behind `modelDeployment`.** Using the
+  documentation sample's `gpt-4.1` against a `gpt-5-mini` deployment produced **zero** figure
+  descriptions, with the skillset accepted and the indexer reporting success.
+
+Cross-referenced with the sibling `document-intelligence-vs-content-understanding` demo, which
+covers the *field extraction* axis (confidence, template drift, tiered routing); this covers
+the *RAG chunk quality* axis.
+
+**Test suite: 40 → 52.**
+
+---
+
+## 2026-08-20
+
+### First live deployment — dogfood run (v1.0.5)
+
+**The pattern had never actually been deployed.** Every prior revision was documentation- and static-analysis-verified only. This entry records the first end-to-end run against a real Azure subscription, which reached a working GitHub-Copilot-consumable MCP endpoint — and found **nine defects** on the way, six of them hard build blockers.
+
+Corpus used: the RISC-V ISA specification + RISC-V debug specification (CC-BY, redistributable), 1,449 indexed chunks across 2 documents.
+
+| # | Defect | Impact if unfixed |
+|---|---|---|
+| 1 | **`infra/deploy.ps1` ignored deployment failure** — `az deployment group create` returned non-zero, but the script continued, wrote a garbage `demo-ids.local.json` from the failed output, and printed "Deployment complete." | Silent false success. The operator believes the platform is up; every downstream step fails with confusing secondary errors. |
+| 2 | **Skillset `subdomainUrl` used the Document Intelligence endpoint** (`<name>.cognitiveservices.azure.com/`) | HTTP 400 `'SubdomainUrl' parameter is not well-formed` — **skillset cannot be created at all**. A `kind: AIServices` account must be referenced by its **AI Foundry** subdomain (`<name>.services.ai.azure.com`), with no trailing slash. Bicep now emits `aiServicesSubdomainUrl` and the script derives it from `foundryResource`. |
+| 3 | **Knowledge base shipped `outputMode: answerSynthesis`** | **Breaks the pattern's headline path.** The native MCP tool accepts *only* a `queries` array — it cannot pass `includeReferenceSourceData` — so under `answerSynthesis` the MCP client receives a synthesised non-answer ("I cannot access external documents") and the grounded passages never arrive. Now defaults to `extractiveData`, which returns ranked passages with `ref_id` + source document + heading path. Overridable via `knowledgeBaseOutputMode`. |
+| 4 | **`--check-mcp-endpoint` called `resp.json()` on an SSE response** | **False negative on the pattern's core claim.** MCP Streamable HTTP replies `text/event-stream`; `resp.json()` raises "Expecting value: line 1 column 1", so a fully working native endpoint was reported unavailable — pushing operators to deploy the optional fallback Container App for no reason. Now parses `data:` lines and sends `Accept: application/json, text/event-stream`. |
+| 5 | **`subprocess.run(["az", ...])` fails on Windows** | `FileNotFoundError: [WinError 2]` — the CLI is `az.cmd`, which `subprocess` will not resolve from a bare `"az"`. Now resolved via `shutil.which`. |
+| 6 | **`get_admin_key` hard-depended on Key Vault data-plane reach** | In governed subscriptions, policy forces Key Vault `publicNetworkAccess: Disabled`, so the lookup fails **even with correct RBAC** and the whole build stops. Now falls back to `az search admin-key show` (control plane), and skips the vault entirely when `keyVault` is absent instead of raising `KeyError`. |
+| 7 | **Search API errors were swallowed** — `raise_for_status()` discards the response body, where the actual reason for a 400 lives | Debugging blind. Added `raise_with_detail()`, which prints status + body before raising. This is what surfaced defect #2. |
+| 8 | **`chatCapacity: 10` (10K TPM) too low for agentic retrieval** | HTTP 429 `exceeded rate limit` on the very first retrieval call — query planning plus answer generation exceeds 10K TPM immediately. Raised the default. |
+| 9 | **`.gitignore` corpus guard was single-level** (`samples/*.pdf`) | A corpus dropped into a subfolder — `samples/corpus/`, which is the natural place to put it — was **not** ignored, defeating the pattern's own "never commit a copyrighted vendor manual" guard. Patterns are now recursive (`samples/**/*.pdf`) and cover the Office formats the Layout skill also reads. |
+
+**Environment finding — governed subscriptions (not a code defect, but it will block a build).** In subscriptions with an Azure Policy that forces `publicNetworkAccess: Disabled` on Storage and Key Vault, the workstation cannot reach the blob data plane to upload the corpus, and explicit `az ... update --public-network-access Enabled` calls are silently reverted by the policy's `modify` effect. The working path is a **Network Security Perimeter** association: create an NSP profile with an inbound subscription rule (covers Search → Storage via managed identity) plus an inbound rule for the operator's public IP, associate the storage account, then set `publicNetworkAccess: SecuredByPerimeter` via REST (the `az storage account update` CLI does not expose that value). Propagation to the data plane takes roughly 2-5 minutes. Documented in `docs/05-troubleshooting.md`.
+
+**Region finding.** `eastus2` — the pattern's default region — returned `InsufficientResourcesAvailable` for AI Search ("the region is currently out of the resources required to provision new services"). `eastus` succeeded. Region availability for AI Search should be checked before committing to the default.
+
+**Validated end to end:**
+- **Full chain proven, including the client.** `.vscode/mcp.json` loaded in VS Code, the MCP server connects, and retrieval works from the editor — Parts A–E of `docs/00-reproduce-this-demo.md` are all complete. Client-side prerequisite learned the hard way: the **GitHub Copilot Chat extension** (`github.copilot-chat`) must be installed; `ms-azuretools.vscode-azure-github-copilot` is a different extension and does not provide it. Added to `docs/02-prerequisites.md`.
+- Native MCP endpoint **confirmed live and working** — `tools/list` returns `knowledge_base_retrieve`; the optional fallback Container App was **not needed**. The tool's input schema accepts exactly one argument, `queries` (array, 1 item, ≤400 chars each).
+- Protocol-level verification: `initialize` returns HTTP 200 / `text/event-stream` / protocol `2025-06-18`; `tools/call` returns grounded references carrying source document + heading path; an unauthenticated request is correctly rejected with **401**.
+- Both API-key and query-key auth work against the MCP endpoint. Entra ID bearer-token auth was **not** exercised.
+- Golden set: 4/4 correct, with correct cross-document routing (debug questions → debug spec, ISA questions → ISA spec) and precise heading-path citations, e.g. `3.14.2. Debug Module Control (dmcontrol, at 0x10)`.
+
+**Test suite: 29 → 40.** Eleven new regression tests, one per defect class above, plus overridability guards. Verified: pytest 40/40, `az bicep build` clean.
+
+---
+
 ## 2026-08-18
 
 ### Azure AI Search API-contract corrections (v1.0.4)
@@ -99,4 +401,4 @@ Honesty note carried through the docs: the native AI Search Knowledge Base → M
 
 ---
 
-*Last updated: 2026-08-18*
+*Last updated: 2026-08-20*

@@ -10,7 +10,7 @@ Work through these in order:
 
 ### 1. Index populated
 
-`idx-documents` must have documents ([03-deployment.md § Phase 2](03-deployment.md#phase-2--ingestion-data-source-skillset-index-indexer) complete) before a Knowledge Base is useful to create.
+`idx-documents-hybrid` must have documents ([03-deployment.md § Phase 2](03-deployment.md#phase-2--hybrid-ingestion) complete) before a Knowledge Base is useful to create.
 
 ### 2. Chat model deployed
 
@@ -72,7 +72,7 @@ mcp.add_tool(retrieve_documents, name=MCP_TOOL_NAME, description=MCP_TOOL_DESCRI
 Internally, it:
 
 1. First tries the AI Search Knowledge Base's direct `retrieve` REST operation (`POST /knowledgebases/{name}/retrieve?api-version=...`) — this is a stable (non-MCP) surface, so it works even where the `/mcp` path doesn't
-2. If no Knowledge Base is provisioned at all, falls back further to a plain hybrid + semantic query directly against `idx-documents` (`POST /indexes('{name}')/docs/search?api-version=...` with `queryType: semantic` and a vector query)
+2. If no Knowledge Base is provisioned at all, falls back further to a plain hybrid + semantic query directly against `idx-documents-hybrid` (`POST /indexes('{name}')/docs/search?api-version=...` with `queryType: semantic` and a vector query)
 3. Formats the result as grounded text with inline citations (`[sourceDocument — sectionH1 > sectionH2 > sectionH3]`)
 
 This gives the pattern **two levels of redundancy**: native MCP → Knowledge Base retrieve via custom wrapper → raw hybrid search via custom wrapper. A working demo is possible even on a Search service with only baseline Basic-tier capabilities.

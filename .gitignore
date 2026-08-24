@@ -31,9 +31,46 @@ demo-ids.local.json
 
 # Bring-your-own test/sample corpus documents -- never commit a real (possibly
 # copyrighted) vendor datasheet/manual. See samples/README.md and
-# tests/fixtures/README.md.
+# tests/fixtures/README.md. Patterns are recursive on purpose: a corpus is
+# commonly dropped into a subfolder (samples/corpus/), which a single-level
+# `samples/*.pdf` rule does NOT match.
+#
+# Image formats are included because the Document Layout and Content
+# Understanding skills BOTH accept images as corpus input (see samples/README.md
+# "Supported file types") -- a scanned datasheet dropped in as .tiff is exactly
+# as sensitive as the .pdf version.
 tests/fixtures/*.pdf
 samples/*.pdf
+tests/fixtures/**/*.pdf
+samples/**/*.pdf
+tests/fixtures/**/*.docx
+samples/**/*.docx
+tests/fixtures/**/*.pptx
+samples/**/*.pptx
+tests/fixtures/**/*.xlsx
+samples/**/*.xlsx
+tests/fixtures/**/*.png
+samples/**/*.png
+tests/fixtures/**/*.jpg
+samples/**/*.jpg
+tests/fixtures/**/*.jpeg
+samples/**/*.jpeg
+tests/fixtures/**/*.tif
+samples/**/*.tif
+tests/fixtures/**/*.tiff
+samples/**/*.tiff
+
+# Generated comparison scorecards and any rendered corpus pages.
+# `compare_extraction_tiers.py --report` writes timestamped JSON/Markdown here.
+# These are machine- and deployment-specific (they embed resource names and
+# per-run measurements) and rendered figure images are derived from the corpus
+# itself, so they inherit the same redistribution caution as the source PDFs.
+# The folder is kept in the repo via out/README.md.
+out/*
+!out/README.md
+
+# Editor/session scratch
+*.bak
 
 # OS junk
 .DS_Store

@@ -139,8 +139,10 @@ Confirm all of these before moving to [03-deployment.md](./03-deployment.md):
 - [ ] AI Search Basic tier (or higher) confirmed available in that region, with semantic ranker
 - [ ] Knowledge Bases / native MCP endpoint availability checked for that region/API version (or you've accepted the fallback-only path for v1)
 - [ ] A technical document corpus (PDFs) ready to upload — see [samples/README.md](../samples/README.md)
-- [ ] VS Code with GitHub Copilot (agent mode / MCP client support) installed and signed in
+- [ ] **AI Search regional *capacity* confirmed, not just tier availability** — a region can list Basic as available and still reject creation with `InsufficientResourcesAvailable`. Verified 2026-08-20: `eastus2` was exhausted, `eastus` succeeded. This is capacity, not quota; retrying in the same region does not help.
+- [ ] **Storage / Key Vault public network access confirmed reachable.** In governed subscriptions an Azure Policy may force `publicNetworkAccess: Disabled` and silently revert an explicit re-enable. Key Vault is survivable (the scripts fall back to the Search control plane); Storage is not — you cannot upload the corpus. See [05-troubleshooting.md § 1](./05-troubleshooting.md#1--foundation-bicep-deploy) for the Network Security Perimeter path.
+- [ ] VS Code with the **GitHub Copilot Chat extension** (`github.copilot-chat`) installed and signed in, with agent mode / MCP client support enabled. Verify with `code --list-extensions | Select-String copilot` — note that `ms-azuretools.vscode-azure-github-copilot` is a *different* extension and does **not** provide Copilot Chat. This tripped the 2026-08-20 dogfood run: the endpoint was fully working while the client leg was untestable because Copilot Chat simply wasn't installed.
 
 ---
 
-*Last updated: 2026-08-18*
+*Last updated: 2026-08-20*

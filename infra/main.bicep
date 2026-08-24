@@ -128,6 +128,8 @@ output deploymentSummary object = {
   foundryResource: foundry.outputs.foundryAccountName
   foundryOpenAIEndpoint: foundry.outputs.openAIEndpoint
   documentIntelligenceEndpoint: foundry.outputs.documentIntelligenceEndpoint
+  aiServicesSubdomainUrl: foundry.outputs.aiServicesSubdomainUrl
+  foundryProject: foundry.outputs.foundryProjectName
   embeddingDeployment: foundry.outputs.embeddingDeploymentName
   chatDeployment: foundry.outputs.chatDeploymentName
   searchService: search.outputs.searchServiceName

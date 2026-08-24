@@ -34,7 +34,7 @@ These decisions are **the v1 baseline**. Deviate only with an explicit decision 
 | 5 | MCP exposure — primary | Knowledge Base's **native MCP endpoint** (`/knowledgebases/{name}/mcp`, Streamable HTTP transport) | Zero custom code — a real, documented Azure AI Search capability, not a preview gamble |
 | 6 | MCP exposure — optional wrapper | Thin **custom MCP server** (Python `mcp` SDK), deployable to Azure Container Apps or run locally over stdio | Defense-in-depth: bearer-token lifecycle management, custom pre/post-processing, or IP allowlisting beyond what the native endpoint offers on its own — not required to get a working demo |
 | 7 | Consumption | GitHub Copilot in VS Code via workspace `.vscode/mcp.json` (agent mode) | Matches the target scenario directly — developers stay in their editor, no separate chat surface |
-| 8 | Auth (v1) | API key (Search admin/query key) | Fastest path to a working demo; Microsoft's recommended production path is an Entra ID bearer token (`https://search.azure.com/.default` scope) + **Search Index Data Reader** RBAC — documented in [01-architecture.md](./docs/01-architecture.md#trust-boundaries--security) |
+| 8 | Auth (v1) | API key (Search admin/query key) | Fastest path to a working demo; Microsoft's recommended production path is an Entra ID bearer token (`https://search.azure.com/.default` scope) + **Search Index Data Reader** RBAC — documented in [01-architecture.md](./docs/01-architecture.md#trust-boundaries-and-security) |
 | 9 | Deployment | Bicep (Storage, a Foundry multi-service Cognitive Services account for Document Intelligence + embeddings, AI Search, optional Container App) + two Python setup scripts — **or** a fully manual Azure Portal + imperative CLI path with no IaC/code required (see [docs/03b-manual-deployment.md](./docs/03b-manual-deployment.md)) | Matches the single-command build convention used by sibling patterns in this Demos folder, while still supporting customers who can't or won't run Bicep |
 
 See [01-architecture.md](./docs/01-architecture.md) for the full design narrative and trust boundaries.
@@ -53,14 +53,17 @@ All narrative documentation lives under `docs/`, in build order. The repo root h
 | docs/02-prerequisites.md | Subscriptions, licensing, RBAC, model/region availability, quotas, naming conventions |
 | docs/03-deployment.md | Step-by-step build (Bicep) with validation gates |
 | docs/03b-manual-deployment.md | Step-by-step build via Azure Portal + imperative CLI — no Bicep/IaC required |
-| docs/04-testing.md | Functional + retrieval-quality + regression tests |
+| docs/04-testing.md | Functional, **chunk-quality**, retrieval, **tier-provenance** and regression tests |
 | docs/05-troubleshooting.md | Symptom-by-symptom diagnosis |
-| docs/06-mcp-endpoint-and-fallback-server.md | Deep dive: native Knowledge Base MCP endpoint + the custom fallback server |
+| docs/06-mcp-endpoint-and-fallback-server.md | Deep dive: native Knowledge Base MCP endpoint + the optional custom wrapper |
 | docs/07-github-copilot-mcp-client-setup.md | Deep dive: wiring VS Code / GitHub Copilot to the MCP endpoint |
+| **docs/08-extraction-tier-comparison.md** | **The "why both services" doc** — DI-only vs CU-only vs hybrid, measured; the 300-page limit; figure verbalization; model selection; and the **cost model**. Read this before quoting a customer. |
 | docs/assets/dev-docs-mcp-knowledge-agent-architecture.drawio | Presentation-ready architecture diagram (customer decks) |
 | infra/ | Bicep IaC (main template + modules) |
-| scripts/ | Python ingestion/setup scripts + the fallback MCP server |
-| tests/ | Smoke tests + reusability guards for the scripts |
+| scripts/hybrid_ingest.py | **The production path** — page-count router, both ingestion tiers, unified index, knowledge base |
+| scripts/compare_extraction_tiers.py | Re-runnable A/B harness — audits chunk quality and retrieval per tier, emits a scorecard to `out/` |
+| scripts/ | Remaining setup scripts + the optional wrapper MCP server |
+| tests/ | Smoke tests, API-contract guards, and harness methodology guards |
 | samples/ | Bring-your-own-corpus guidance |
 | .azuredevops/pipelines/ | ADO validate + deploy pipeline |
 | demo-ids.template.json | Deployment IDs **+ the `corpus` block — the only corpus-specific configuration in the pattern** |
@@ -124,4 +127,4 @@ This folder is checked into Azure DevOps as a standalone repo. `.gitignore` excl
 
 ---
 
-*Last updated: 2026-08-18*
+*Last updated: 2026-08-20*

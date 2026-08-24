@@ -6,6 +6,12 @@ Common failure modes and fixes for the Developer Docs MCP Knowledge Base pattern
 
 | Symptom | Most likely root cause | Section |
 |---|---|---|
+| Bicep deploy prints "Deployment complete" but nothing was created | Fixed 2026-08-20 — `deploy.ps1` used to ignore `az` failure. Re-pull the pattern if your copy predates that | § 1 |
+| Bicep deploy fails: AI Search `InsufficientResourcesAvailable` | The region is out of AI Search capacity — try another region | § 1 |
+| Corpus upload fails: `AuthorizationFailure` / "blocked by network rules" | Governed subscription forces `publicNetworkAccess: Disabled` on Storage | § 1 |
+| `az keyvault secret show` fails with `Forbidden: Public network access is disabled` | Same policy applied to Key Vault — the scripts fall back to the Search control plane | § 1 |
+| Skillset creation fails: `'SubdomainUrl' parameter is not well-formed` | Wrong AI Services subdomain form or a trailing slash | § 2 |
+| `FileNotFoundError: [WinError 2]` running a setup script | Windows `az.cmd` resolution — fixed 2026-08-20 via `shutil.which` | § 2 |
 | Bicep deploy fails on the Foundry/Cognitive Services module | Model not available in the target region, or quota exhausted | § 1 |
 | Indexer run shows failed documents | PDF is scanned/image-only with no extractable layer, or exceeds size/page limits | § 2 |
 | Indexer fails on every document (`file_data` missing) | Indexer lacks `allowSkillsetToReadFileData: true` | § 2 |
@@ -13,7 +19,11 @@ Common failure modes and fixes for the Developer Docs MCP Knowledge Base pattern
 | Chunks missing `sectionH1` / `sectionH2` | Split skill isn't reading the Layout skill's structured output correctly, or the doc has no headings at that depth | § 2 |
 | Citations come back with empty source data | `includeReferenceSourceData` not set, or field missing from the knowledge source's `sourceDataFields` | § 2 |
 | Knowledge Base `retrieve` call returns empty/low-quality results | Semantic ranker not enabled, or query planning model not deployed | § 3 |
+| Retrieval returns HTTP 429 `exceeded rate limit` | Chat deployment TPM too low for agentic retrieval | § 7 |
+| MCP client gets "I cannot access external documents" instead of passages | Knowledge base `outputMode` is `answerSynthesis`; MCP needs `extractiveData` | § 3 |
+| MCP endpoint check reports "not available" but the endpoint works | SSE response parsed as JSON — fixed 2026-08-20 | § 4 |
 | MCP endpoint check returns 404 / `FeatureNotEnabled` | Native Knowledge Base MCP surface not available on this Search tier/region/API version | § 3, § 4 |
+| MCP `tools/call` returns "`arguments.queries` field ... is required" | The native tool takes `queries` (array), not `query` | § 4 |
 | Fallback Container App fails to start | Missing Key Vault reference, wrong managed identity role assignment | § 4 |
 | VS Code doesn't show the MCP server as connected | `.vscode/mcp.json` syntax error, wrong endpoint URL, or auth header missing | § 5 |
 | Copilot Chat never calls the tool | Tool description too vague, or GitHub Copilot's agent mode / MCP support not enabled | § 5 |
@@ -23,6 +33,41 @@ Common failure modes and fixes for the Developer Docs MCP Knowledge Base pattern
 
 ## 1 — Foundation (Bicep deploy)
 
+**Symptom: AI Search fails with `InsufficientResourcesAvailable` — "The region 'X' is currently out of the resources required to provision new services."**
+This is regional capacity exhaustion, not a quota problem, and no amount of retrying in the same region fixes it. Deploy to another region. (Observed 2026-08-20: `eastus2` — the pattern's default — was exhausted; `eastus` succeeded.) Confirm your chosen region also has quota for `text-embedding-3-large` on the **Standard** SKU (not just GlobalStandard) and your chat model:
+
+```powershell
+az cognitiveservices usage list -l <region> -o json |
+  ConvertFrom-Json |
+  Where-Object { $_.name.value -match 'text-embedding-3-large|gpt-5-mini' } |
+  ForEach-Object { "{0}  {1}/{2}" -f $_.name.value, $_.currentValue, $_.limit }
+```
+
+**Symptom: corpus upload fails with `AuthorizationFailure` / "The request may be blocked by network rules of storage account", and `az keyvault secret show` returns `Forbidden: Public network access is disabled`.**
+You are in a **governed subscription** where an Azure Policy forces `publicNetworkAccess: Disabled` on Storage and Key Vault. RBAC is not the problem — check first, and note the policy will silently revert an explicit re-enable:
+
+```powershell
+az storage account show -n <storage> -g <rg> --query publicNetworkAccess -o tsv   # Disabled
+az storage account update -n <storage> -g <rg> --public-network-access Enabled --query publicNetworkAccess -o tsv   # still Disabled -> policy modify effect
+```
+
+Key Vault is **not** a blocker: `post_deploy_search.py` falls back to `az search admin-key show` automatically. Storage **is** a blocker, because the indexer needs the blobs and you need to upload them. The working path is a **Network Security Perimeter** (NSP):
+
+1. Find the perimeter (governed subscriptions normally already have one):
+   ```powershell
+   az resource list --resource-type "Microsoft.Network/networkSecurityPerimeters" -o table
+   ```
+2. Create a profile with two inbound rules — one for the whole subscription (this is what lets AI Search reach Storage via its managed identity) and one for your workstation's public IP — plus an outbound rule. Prefer a **dedicated profile** over editing the shared `defaultProfile`, so you don't change access for unrelated resources.
+3. Associate the storage account with that profile in `Enforced` mode.
+4. Set the storage account to perimeter mode — note the `az storage account` CLI does **not** expose this value, so it must go through REST:
+   ```powershell
+   az rest --method patch `
+     --url "https://management.azure.com/subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Storage/storageAccounts/<storage>?api-version=2023-05-01" `
+     --body '{"properties":{"publicNetworkAccess":"SecuredByPerimeter"}}' `
+     --headers "Content-Type=application/json"
+   ```
+5. Wait for propagation — roughly 2-5 minutes before the data plane accepts requests. Re-test with `az storage container list --account-name <storage> --auth-mode login`.
+
 **Symptom: `foundry.bicep` deployment fails with a model-capacity or region error.**
 Check `az cognitiveservices account list-models --name <account> --resource-group <rg>` for `text-embedding-3-large` and your chosen chat model in the target region. If unavailable, redeploy in a Tier-1/2 region from [02-prerequisites.md § 8](./02-prerequisites.md#8--regional--preview-feature-availability).
 
@@ -30,6 +75,15 @@ Check `az cognitiveservices account list-models --name <account> --resource-grou
 Don't set both `authOptions` and `disableLocalAuth: true` in `search.bicep` — they're mutually exclusive on the AI Search ARM API. Pick one auth model.
 
 ## 2 — Ingestion (indexer / skillset)
+
+**Symptom: skillset creation fails with HTTP 400 `'SubdomainUrl' parameter is not well-formed`.**
+The skillset's `cognitiveServices.subdomainUrl` must be the **AI Foundry** subdomain of the multi-service account — `https://<name>.services.ai.azure.com` — **without** a trailing slash. Passing the Document Intelligence / FormRecognizer endpoint (`https://<name>.cognitiveservices.azure.com/`) is rejected, even though it is literally the same resource and is what the Azure portal and the Bicep `documentIntelligenceEndpoint` output both display. The Bicep now emits `aiServicesSubdomainUrl` for this, and `post_deploy_search.py` derives it from `foundryResource`; set `aiServicesSubdomainUrl` explicitly in `demo-ids.local.json` to override.
+
+**Symptom: `FileNotFoundError: [WinError 2] The system cannot find the file specified` when a setup script shells out to `az`.**
+On Windows the Azure CLI is `az.cmd`, which `subprocess.run(["az", ...])` cannot resolve without a shell. The scripts now resolve it through `shutil.which("az")`. If you see this in your own extension code, do the same rather than adding `shell=True`.
+
+**Symptom: a large PDF logs `Truncated extracted text to '524288' characters`.**
+This warning comes from the blob `DocumentExtraction` stage, not the Layout skill, and is safe to ignore — the Layout skill reads `file_data` directly. A 700-page specification still indexed fully (1,300 chunks) with this warning present. Expect long runtimes: a single 700-page PDF took roughly 25 minutes to work through the Layout skill.
 
 **Symptom: indexer reports failed documents.**
 Most common cause: a scanned/image-only PDF with no text layer that the Layout model can't structure usefully, or a PDF exceeding AI Search's per-document size/page limits. Check the indexer execution history for the specific error per document; consider pre-splitting oversized manuals.
@@ -48,12 +102,39 @@ First check whether the source document actually has headings at that depth — 
 
 ## 3 — Knowledge Base / retrieval quality
 
+**Symptom: the MCP client (GitHub Copilot) gets a prose non-answer — e.g. "I cannot access external documents right now" or "No relevant content was found" — while a direct `POST /knowledgebases/{name}/retrieve` call returns good grounded passages.**
+The knowledge base's `outputMode` is `answerSynthesis`. That mode has the query-planning model write the final prose, but the **native MCP tool cannot pass `includeReferenceSourceData`** (its schema accepts only `queries`), so the synthesising model receives references with no source data and answers that it has nothing to read. Nothing is wrong with your index. Set `outputMode` to `extractiveData`, which returns the ranked passages themselves — each with `ref_id`, source document title, and heading path — and let the MCP client do its own synthesis and citation:
+
+```powershell
+$ak = az search admin-key show -g <rg> --service-name <search> --query primaryKey -o tsv
+Invoke-RestMethod -Uri "https://<search>.search.windows.net/knowledgebases/<kb>?api-version=2026-05-01-preview" `
+  -Headers @{'api-key'=$ak} | Select-Object outputMode
+```
+
+`post_deploy_search.py` now defaults to `extractiveData`; override with `knowledgeBaseOutputMode` in `demo-ids.local.json` only if a non-LLM client genuinely needs prose.
+
 **Symptom: `retrieve` calls return empty or clearly irrelevant results.**
 - Confirm semantic ranker is enabled on the Search service (a per-service setting — see [02-prerequisites.md § 3](./02-prerequisites.md#3--azure-ai-search))
 - Confirm the Knowledge Base's query-planning chat model deployment exists and is reachable
-- Re-run a manual hybrid query directly against `idx-documents` in Search Explorer to isolate whether the problem is indexing or agent configuration
+- Re-run a manual hybrid query directly against `idx-documents-hybrid` in Search Explorer to isolate whether the problem is indexing or agent configuration
+- Check the question is actually answerable from the ingested corpus before assuming a retrieval bug — "No relevant content was found for your query" is the correct response to an out-of-corpus question
 
 ## 4 — MCP endpoint (native or fallback)
+
+**Symptom: `--check-mcp-endpoint` reports "Native endpoint not available", but the endpoint actually works.**
+Fixed 2026-08-20. The MCP Streamable HTTP transport replies with **Server-Sent Events** (`Content-Type: text/event-stream`) — each JSON-RPC message arrives on a `data:` line — so calling `resp.json()` on it raises `Expecting value: line 1 column 1 (char 0)` and the check falsely concluded the endpoint was missing. That in turn pushes you to deploy the optional fallback Container App for no reason. If your copy predates the fix, verify by hand:
+
+```powershell
+$key = az search admin-key show -g <rg> --service-name <search> --query primaryKey -o tsv
+$body = @{ jsonrpc='2.0'; id=1; method='tools/list' } | ConvertTo-Json
+Invoke-WebRequest -Uri "https://<search>.search.windows.net/knowledgebases/<kb>/mcp?api-version=2026-05-01-preview" `
+  -Method Post -UseBasicParsing -Body $body `
+  -Headers @{ 'api-key'=$key; 'Content-Type'='application/json'; 'Accept'='application/json, text/event-stream' }
+```
+A working endpoint returns HTTP 200 with `event: message` / `data: {...}` advertising the `knowledge_base_retrieve` tool. Always send `Accept: application/json, text/event-stream`.
+
+**Symptom: `tools/call` returns "An error occurred invoking 'knowledge_base_retrieve': The 'arguments.queries' field for the tool call is required and must be a JSON array."**
+The native tool takes `queries` — a JSON **array** of 1 string, max 400 characters — not `query`. Its input schema sets `minItems: 1`, `maxItems: 1`, and `additionalProperties: false`, so there is no way to pass retrieval options (reranker threshold, `includeReferenceSourceData`) through the MCP call. Anything you need must be configured server-side on the knowledge base — see § 3.
 
 **Symptom: native MCP endpoint check returns 404 or a feature-not-enabled error.**
 This is expected on Search services/regions where the MCP endpoint hasn't rolled out yet, or where the API version has moved on since this pattern was last verified. Proceed with the optional custom wrapper server (Phase 4) — this is exactly what it's for. Re-check availability periodically; see [docs/06](./06-mcp-endpoint-and-fallback-server.md) for the current verification command.
@@ -75,6 +156,16 @@ Make the MCP tool's description more specific to the corpus domain — set `corp
 Almost always a chunking issue — a register table or multi-step procedure split across two chunks loses context. Reduce chunk size or increase overlap in the Split skill config, re-run the indexer, and re-test against the golden set ([04-testing.md § C](./04-testing.md#c--quality-golden-set)).
 
 ## 7 — Cost and quota
+
+**Symptom: retrieval fails with HTTP 429 — "Your requests to gpt-5-mini for chat in <region> have exceeded rate limit."**
+The chat deployment's TPM is too low. Agentic retrieval spends the chat model on query planning *and* (under `answerSynthesis`) answer generation on every call, so the pattern's original 10K TPM default returned 429 on the very first query. The default is now 150K TPM; raise an existing deployment with:
+
+```powershell
+az cognitiveservices account deployment create -n <foundry> -g <rg> `
+  --deployment-name chat --model-name gpt-5-mini --model-version 2025-08-07 `
+  --model-format OpenAI --sku-name GlobalStandard --sku-capacity 150
+```
+(There is no `az cognitiveservices account deployment update` — re-running `create` with the same deployment name updates capacity in place.)
 
 **Symptom: unexpected AI Search or Azure OpenAI cost.**
 Check the indexer schedule isn't re-processing the full corpus more often than needed; check the fallback MCP server's Container App scale-to-zero setting is enabled for low-traffic POC use.
@@ -107,4 +198,4 @@ python scripts/post_deploy_search.py --ids-file demo-ids.local.json --test-retri
 
 ---
 
-*Last updated: 2026-08-18*
+*Last updated: 2026-08-20*

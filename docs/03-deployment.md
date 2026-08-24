@@ -13,13 +13,16 @@ Step-by-step build of the Developer Docs MCP Knowledge Base pattern via Bicep/Ia
 | Phase | What you build | ~Time | Validation at end |
 |---|---|---|---|
 | 0 | Authenticate to the intended tenant + subscription | 2 min | `az account show` matches target |
-| 1 | Foundation resources (RG, Storage, Key Vault, Foundry, Search) via Bicep | 30-45 min | All 5 resources show `Succeeded`; RBAC assigned |
-| 2 | Upload sample corpus + create data source, skillset, index, indexer | 30 min | Indexer run shows 0 failed docs; index has documents |
-| 3 | Create the Knowledge Base; verify/enable the MCP endpoint (native or confirm fallback) | 30-60 min | Retrieve call returns grounded, cited results |
-| 4 | Deploy the fallback MCP server (if native MCP isn't available or you want both) | 45 min | Container App responds to an MCP `tools/list` call |
-| 5 | Wire GitHub Copilot / VS Code to the MCP endpoint | 15 min | Copilot Chat (agent mode) answers a corpus question with a citation |
+| 1 | Foundation resources (RG, Storage, Key Vault, Foundry + project, Search) via Bicep | 20-40 min | All resources `Succeeded`; RBAC assigned |
+| 2 | Frontier model deployments, route the corpus by page count, build **both** ingestion tiers | 20 min setup + ingestion | Both indexers `success`; index has rows from every tier routed to |
+| 3 | Knowledge Base + verify the native MCP endpoint | 10 min | Retrieve call returns grounded, cited passages |
+| 4 | Optional custom wrapper MCP server | 45 min | Container App responds to an MCP `tools/list` call |
+| 5 | Wire GitHub Copilot / VS Code | 15 min | Copilot Chat (agent mode) answers a corpus question with a citation |
 
-**Total demo build: ~3-4 hours of hands-on time** (dominated by Phase 1 resource provisioning waits and Phase 3's preview-feature verification).
+**Total hands-on time: ~1.5 hours.** Wall-clock is dominated by **ingestion**, which scales
+with the corpus: Tier CU is fast, but Tier DI+ makes one vision call per extracted figure and
+took ~45 minutes for a single 906-page specification. Phase 4 is optional and was not needed
+in the reference build.
 
 ---
 
@@ -86,54 +89,119 @@ az role assignment list --resource-group "rg-ddmcp-$Env-$Region" -o table
 
 ---
 
-## Phase 2 — Ingestion: data source, skillset, index, indexer
+## Phase 2 — Hybrid ingestion
 
-### 2.1 Upload your corpus
+Ingestion routes each document to the extraction tier that handles it best, then lands both
+tiers in **one** index. See [01-architecture.md](./01-architecture.md#ingestion-tiers) for the
+design and [08-extraction-tier-comparison.md](./08-extraction-tier-comparison.md) for the
+measured justification and cost.
+
+### 2.1 Deploy the frontier models
+
+The Bicep creates `embedding` and `chat`. The hybrid additionally needs two frontier
+deployments — names must match `demo-ids.local.json` (`frontierDeployment`,
+`cuModelDeployment`):
+
+```powershell
+# One frontier deployment covers figure verbalization (both tiers) AND
+# knowledge-base query planning.
+az cognitiveservices account deployment create -n <foundry> -g <rg> `
+  --deployment-name sol --model-name gpt-5.6-sol --model-version 2026-07-09 `
+  --model-format OpenAI --sku-name GlobalStandard --sku-capacity 200
+```
+
+> A brand-new deployment takes a few minutes to become usable, and the failure looks like
+> three different problems depending on which skill hits it first:
+> - Content Understanding: `DeploymentIdNotFound` — *"the OpenAI deployment 'x' does not exist"*
+> - Content Understanding: `FigureUnderstandingSkipped` — *"figure understanding was skipped because the model deployment returned an error"*
+> - Vision skill: `Web Api skill response is invalid` wrapping an `InternalServerError`
+>
+> All three mean the same thing: the deployment is not serving yet, even though
+> `az cognitiveservices account deployment list` already reports `Succeeded`. Confirm with a
+> direct chat-completions call; once that returns 200, reset and re-run the indexers. Do not
+> start changing skillset configuration — nothing is wrong with it.
+
+### 2.2 Route the corpus (free — no service calls)
 
 ```powershell
 cd ../scripts
 pip install -r requirements.txt
-python upload_documents.py --ids-file ../demo-ids.local.json --source-dir "<path-to-your-pdfs>"
+python hybrid_ingest.py --ids-file ../demo-ids.local.json --plan --source-dir "<path-to-your-pdfs>"
 ```
 
-See [samples/README.md](../samples/README.md) if you don't have a corpus ready — do **not** use copyrighted vendor manuals in a shared/customer-facing demo without checking redistribution rights; bring your own or use a public-domain technical document.
+Page count is read locally, so routing costs nothing and no document is processed twice. This
+output is also the input to a cost estimate — see
+[08 § Cost model](./08-extraction-tier-comparison.md#cost-model).
 
-### 2.2 Create the data source, skillset, index, and indexer; run the indexer
+See [samples/README.md](../samples/README.md) if you don't have a corpus ready — do **not** use
+copyrighted vendor manuals in a shared or customer-facing demo without checking redistribution
+rights.
+
+### 2.3 Upload into the tier prefixes
 
 ```powershell
-python post_deploy_search.py --ids-file ../demo-ids.local.json --create-index --create-skillset --create-indexer --run-indexer
+python hybrid_ingest.py --ids-file ../demo-ids.local.json --upload --source-dir "<path-to-your-pdfs>"
 ```
 
-This script (see [scripts/post_deploy_search.py](../scripts/post_deploy_search.py)) calls the AI Search REST API to:
+Documents land under `raw/cu/` (≤ 300 pages) or `raw/di/` (> 300 pages). Each tier's data
+source scopes to its own folder — AI Search indexers cannot filter on page count, but they can
+scope to a prefix.
 
-1. Create the `ds-documents-blob` data source pointing at the `raw` container
-2. Create the `skillset-documents` skillset: Document Layout skill → Split skill (heading/page-aware) → AOAI Embedding skill vectorizer
-3. Create the `idx-documents` index (schema in [01-architecture.md](./01-architecture.md#reference-schemas))
-4. Create and run the `ixr-documents` indexer
-
-### 2.3 Confirm ingestion succeeded
+### 2.4 Build both tiers and ingest
 
 ```powershell
-python post_deploy_search.py --ids-file ../demo-ids.local.json --indexer-status
+python hybrid_ingest.py --ids-file ../demo-ids.local.json --build
 ```
+
+[`scripts/hybrid_ingest.py`](../scripts/hybrid_ingest.py) creates, in order:
+
+1. The unified `idx-documents-hybrid` index (schema in
+   [01-architecture.md](./01-architecture.md#the-unified-index))
+2. `skillset-hybrid-cu` — Content Understanding (semantic chunking + figure descriptions)
+3. `skillset-hybrid-di` — Document Layout + Split + embedding **+ vision skill** for figure
+   verbalization
+4. `ds-hybrid-cu` / `ds-hybrid-di` data sources scoped to the two blob prefixes
+5. `ixr-hybrid-cu` / `ixr-hybrid-di` indexers
+6. `ks-hybrid` knowledge source and `kb-hybrid` knowledge base (`outputMode: extractiveData`)
+
+then starts both indexers.
+
+### 2.5 Confirm ingestion succeeded
+
+```powershell
+python hybrid_ingest.py --ids-file ../demo-ids.local.json --status
+```
+
+**Expect Tier DI+ to be slow** — one vision call per extracted figure. A 906-page
+specification took roughly 45 minutes. Tier CU is much faster.
 
 ### Phase 2 validation
 
-- [ ] Indexer status shows `success` with 0 failed items (warnings on a handful of pages are common and usually fine — see [05-troubleshooting.md](./05-troubleshooting.md))
-- [ ] `idx-documents` document count > 0 (`az search` or the portal Search Explorer)
-- [ ] A manual query in Search Explorer returns chunks with populated `sectionH1` / `sectionH2`
+- [ ] Both indexers report `success` with 0 failed items
+- [ ] The index contains rows from **every tier you routed to** — check the `extractionTier`
+      facet, not just the total row count
+- [ ] `contentKind: image-description` rows exist if any routed document contains figures
+- [ ] A Search Explorer query returns chunks with a populated `sectionLabel` (Tier DI+) or
+      `pageNumberFrom` / `pageNumberTo` (Tier CU)
 
 ---
 
 ## Phase 3 — Knowledge Base + MCP endpoint
 
-*Full reference — endpoint paths, API versions, the native-vs-fallback decision, and the exact REST payloads — lives in [docs/06-mcp-endpoint-and-fallback-server.md](./06-mcp-endpoint-and-fallback-server.md). This phase is the short version.*
+*Full reference — endpoint paths, API versions, the native-vs-wrapper decision, and exact REST
+payloads — lives in
+[docs/06-mcp-endpoint-and-fallback-server.md](./06-mcp-endpoint-and-fallback-server.md). This
+phase is the short version.*
 
-### 3.1 Create the Knowledge Base
+### 3.1 The Knowledge Base
 
-```powershell
-python post_deploy_search.py --ids-file ../demo-ids.local.json --create-knowledge-base
-```
+`hybrid_ingest.py --build` already created `kb-hybrid` over the unified index with
+`outputMode: extractiveData`.
+
+> **`extractiveData` is required, not a preference.** The native MCP tool accepts only a
+> `queries` array and cannot request reference source data, so under `answerSynthesis` the
+> client receives a synthesised *"I cannot access external documents"* non-answer while direct
+> REST retrieval works fine.
 
 ### 3.2 Verify the native MCP endpoint
 
@@ -141,13 +209,14 @@ python post_deploy_search.py --ids-file ../demo-ids.local.json --create-knowledg
 python post_deploy_search.py --ids-file ../demo-ids.local.json --check-mcp-endpoint
 ```
 
-If this succeeds, you have a working native MCP endpoint — skip to Phase 5. If it returns a 404 / `FeatureNotEnabled`-style error, the preview surface isn't available on your Search service yet — proceed to Phase 4 for the fallback.
+If this succeeds you have a working native MCP endpoint — skip to Phase 5. Phase 4's custom
+wrapper is optional and was **not** needed in the reference build.
 
 ### Phase 3 validation
 
-- [ ] Knowledge Base created (`knowledgebases/kb-documents` returns 200)
-- [ ] A direct `retrieve` call against the Knowledge Base returns a grounded answer with citations
-- [ ] MCP endpoint check result recorded (native available, or fallback required) — noted in `demo-ids.local.json`
+- [ ] `knowledgebases/kb-hybrid` returns 200
+- [ ] A direct `retrieve` call returns grounded passages with citations
+- [ ] MCP endpoint availability recorded in `demo-ids.local.json`
 
 ---
 
@@ -189,11 +258,15 @@ cd ../scripts
 ## Post-deployment checklist
 
 - [ ] All Phase 0-5 validation boxes checked
+- [ ] **Both tiers verified contributing** — check the `extractionTier` facet, not just row count
 - [ ] Indexer schedule configured if the corpus will be updated regularly (or documented as manual re-run)
-- [ ] Cost alert configured on the resource group (see [02-prerequisites.md § 11](./02-prerequisites.md#11--rough-cost-estimate-poc-scale-monthly))
+- [ ] Cost alert configured on the resource group (see [08 § Cost model](./08-extraction-tier-comparison.md#cost-model))
 - [ ] `demo-ids.local.json` backed up somewhere safe (not committed) if you'll tear down and rebuild
 - [ ] Owner identified for keeping the corpus current as source documents change
+- [ ] Teardown planned — AI Search Basic and the model deployments bill continuously:
+      `python hybrid_ingest.py --ids-file ../demo-ids.local.json --teardown` then
+      `az group delete --name <rg> --yes --no-wait`
 
 ---
 
-*Last updated: 2026-08-18*
+*Last updated: 2026-08-21*

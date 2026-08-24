@@ -12,7 +12,7 @@ A complete alternative to [03-deployment.md](./03-deployment.md) for customers w
 |---|---|---|---|
 | 0 | Authenticate to the intended tenant + subscription | 2 min | `az account show` matches target |
 | 1 (manual) | Foundation resources (RG, Storage, Key Vault, Foundry, Search) via imperative `az` commands | 45-60 min | All 5 resources exist; RBAC assigned |
-| 2 | Same as [03-deployment.md § Phase 2](./03-deployment.md#phase-2--ingestion-data-source-skillset-index-indexer) — unchanged | 30 min | Indexer run shows 0 failed docs |
+| 2 | Same as [03-deployment.md § Phase 2](./03-deployment.md#phase-2--hybrid-ingestion) — unchanged | 30 min | Indexer run shows 0 failed docs |
 | 3 | Same as [03-deployment.md § Phase 3](./03-deployment.md#phase-3--knowledge-base--mcp-endpoint) — unchanged | 30-60 min | Retrieve call returns grounded, cited results |
 | 4 (manual) | Optional custom wrapper server via imperative `az` commands (skip if the native endpoint check in Phase 3 succeeded and you don't want the wrapper) | 45-60 min | Container App responds to an MCP `tools/list` call |
 | 5 | Same as [03-deployment.md § Phase 5](./03-deployment.md#phase-5--wire-github-copilot--vs-code) — unchanged | 15 min | Copilot Chat answers a corpus question with a citation |
@@ -68,25 +68,54 @@ az cognitiveservices account create `
   --custom-domain $Foundry `
   --assign-identity
 
-# Two model deployments -- verify current name/version/SKU against the
-# Foundry model catalog (https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure)
-# before deploying; the values below were current as of 2026-08-18.
+# A Foundry PROJECT is required -- without one, Content Understanding and other
+# Foundry-surfaced capabilities fail. The Bicep path creates this automatically;
+# the first manual build of this pattern had to add it by hand in the portal.
+az rest --method put `
+  --url "https://management.azure.com/subscriptions/$SubId/resourceGroups/$Rg/providers/Microsoft.CognitiveServices/accounts/$Foundry/projects/$Foundry-project?api-version=2025-06-01" `
+  --headers "Content-Type=application/json" `
+  --body "{`"location`":`"$Region`",`"identity`":{`"type`":`"SystemAssigned`"},`"properties`":{`"displayName`":`"$Foundry-project`"}}"
+
+# Model deployments -- verify current name/version/SKU against the Foundry model
+# catalog (https://learn.microsoft.com/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure)
+# before deploying; values below were current as of 2026-08-21.
 az cognitiveservices account deployment create `
   --name $Foundry --resource-group $Rg `
   --deployment-name embedding `
   --model-name text-embedding-3-large --model-version "1" --model-format OpenAI `
   --sku-name Standard --sku-capacity 30
 
+# Agentic retrieval spends this on query planning AND answer generation per call;
+# 10K TPM returns HTTP 429 on the very first query.
 az cognitiveservices account deployment create `
   --name $Foundry --resource-group $Rg `
   --deployment-name chat `
   --model-name gpt-5-mini --model-version "2025-08-07" --model-format OpenAI `
-  --sku-name GlobalStandard --sku-capacity 10
+  --sku-name GlobalStandard --sku-capacity 150
+
+# --- Frontier models used by the hybrid ingestion path ---------------------
+# Image verbalization + knowledge-base query planning (no model allowlist)
+az cognitiveservices account deployment create `
+  --name $Foundry --resource-group $Rg `
+  --deployment-name sol `
+  --model-name gpt-5.6-sol --model-version "2026-07-09" --model-format OpenAI `
+  --sku-name GlobalStandard --sku-capacity 200
+
+# Content Understanding figure descriptions -- CU enforces its OWN model
+# allowlist that lags the Foundry catalog, so this is deliberately a different
+# (slightly older) model than `sol`. See docs/08 § Model selection.
+az cognitiveservices account deployment create `
+  --name $Foundry --resource-group $Rg `
+  --deployment-name cu-frontier `
+  --model-name gpt-5.5 --model-version "2026-04-24" --model-format OpenAI `
+  --sku-name GlobalStandard --sku-capacity 200
 ```
 
-**Portal equivalent:** Azure AI Foundry portal (or Azure Portal → Azure AI services → + Create → "Azure AI services multi-service account") → kind `AIServices`, S0 pricing tier → after creation, Foundry portal → Deployments → + Deploy model, once for `text-embedding-3-large` (Standard, 30K TPM) and once for `gpt-5-mini` (Global Standard, 10K TPM).
+**Portal equivalent:** Azure AI Foundry portal (or Azure Portal → Azure AI services → + Create → "Azure AI services multi-service account") → kind `AIServices`, S0 pricing tier → create a **project** in the Foundry portal → then Deployments → + Deploy model, once each for `text-embedding-3-large`, `gpt-5-mini`, `gpt-5.6-sol`, and `gpt-5.5`.
 
-> **Both Document Intelligence and Azure OpenAI are served from this single resource** — no separate Document Intelligence account needed (see [01-architecture.md § Layer note](./01-architecture.md#layer-note--why-a-foundry-multi-service-account-not-standalone-resources)).
+> **A brand-new deployment is not immediately resolvable.** Content Understanding can return `DeploymentIdNotFound` for a deployment the control plane already reports `Succeeded` — wait a few minutes and re-run.
+
+> **Both Document Intelligence and Azure OpenAI are served from this single resource** — no separate Document Intelligence account needed (see [01-architecture.md](./01-architecture.md)).
 
 ### 1.3 Azure AI Search
 
@@ -176,7 +205,7 @@ Copy `demo-ids.template.json` to `demo-ids.local.json` (gitignored) and fill in 
 
 ## Phase 2 — Ingestion
 
-**No changes from the Bicep path.** `scripts/upload_documents.py` and `scripts/post_deploy_search.py` call the AI Search / Blob Storage REST APIs directly — they don't care whether the underlying resources were created by Bicep or by hand. Follow [03-deployment.md § Phase 2](./03-deployment.md#phase-2--ingestion-data-source-skillset-index-indexer) exactly as written.
+**No changes from the Bicep path.** `scripts/upload_documents.py` and `scripts/post_deploy_search.py` call the AI Search / Blob Storage REST APIs directly — they don't care whether the underlying resources were created by Bicep or by hand. Follow [03-deployment.md § Phase 2](./03-deployment.md#phase-2--hybrid-ingestion) exactly as written.
 
 ## Phase 3 — Knowledge Base + MCP endpoint
 

@@ -1,101 +1,153 @@
 # 04 — Testing
 
-End-to-end test plan. Run these after Phase 5 validation in [03-deployment.md](./03-deployment.md) passes.
+How to prove the build actually works — and, specifically, that **both ingestion tiers are
+earning their place**. Run these after [03-deployment.md](./03-deployment.md).
 
-## Test categories
-
-| Category | Goal | Cadence |
-|---|---|---|
-| A. Functional | End-to-end happy path: PDF in → cited answer out via MCP | Every deployment |
-| B. Smoke | Scripts import cleanly, REST calls return expected shape | Every deployment |
-| C. Quality (golden set) | Retrieval recall/precision + citation accuracy against known Q&A pairs | Before any customer demo; monthly |
-| D. Native-vs-fallback comparison | Confirm both MCP paths return equivalent grounded answers | Once per instance, and after any Search service tier change |
-| E. End-to-end demo script | The lived developer experience in VS Code | Day-of-demo dry run |
-| F. Regression | Re-run after any schema, skillset, or MCP server change | After every change |
-
-## A — Functional tests
-
-1. Upload a known test PDF (`tests/fixtures/sample.pdf` or your corpus) → run the indexer → confirm it appears in `idx-documents`
-2. Call the Knowledge Base's `retrieve` operation directly with a question the test PDF answers → confirm the response text and citation match
-3. Call the MCP endpoint (native or fallback) with the same question → confirm the MCP tool result matches the direct `retrieve` call
-
-## B — Smoke tests
-
-Automated in `tests/test_post_deploy_search.py` and `tests/test_mcp_fallback_server.py`:
-
-```powershell
-cd scripts
-pip install -r requirements.txt
-pytest ../tests -q
-```
-
-- Script modules import without error
-- `post_deploy_search.py` REST payload builders produce well-formed JSON matching the documented schema
-- `mcp_fallback_server.py`'s retrieval helper returns a non-empty, correctly-shaped result for a mocked Search response
-
-## C — Quality (golden set)
-
-Build a small golden set (10-20 question/answer pairs) from your actual corpus:
-
-| Field | Description |
-|---|---|
-| `question` | Natural-language developer question |
-| `expected_source_document` | The PDF that should be cited |
-| `expected_section` | Acceptable heading path for the citation (e.g. `Peripherals > Timer Registers`) |
-| `expected_answer_contains` | A substring/fact that must appear in the answer |
-
-**Acceptance thresholds (v1 default — tune per engagement):**
-
-- >= 90% of golden-set questions return a citation from the correct source document
-- >= 80% of citations land within the expected page range
-- 100% of answers that should be "not found in the corpus" correctly decline rather than hallucinate
-
-Log failures with the actual retrieved chunk(s) — most quality misses trace back to chunk boundaries splitting a table or register definition across two chunks; re-tune the Split skill's page/overlap settings if this recurs.
-
-## D — Native-vs-fallback comparison
-
-If you deployed both MCP paths (Phase 3 native + Phase 4 fallback), run the same golden-set questions against both and diff the citations. They should agree — if they diverge, one path is likely querying a stale or differently-configured Knowledge Base/index reference; re-check both configs against [docs/06](./06-mcp-endpoint-and-fallback-server.md).
-
-## E — End-to-end demo script
-
-| Step | Action | Demo point |
-|---|---|---|
-| 1 | Open VS Code in a workspace with `.vscode/mcp.json` configured | Zero-friction setup — one file, no separate portal |
-| 2 | Open a firmware/hardware source file relevant to the corpus | Grounding happens in-context, not a separate chat window |
-| 3 | Ask Copilot Chat (agent mode): "Does this GPIO config match the datasheet's default pin mux?" | Cross-references code + datasheet in one turn |
-| 4 | Point out the citation (document, page, section) in the response | Answers are traceable, not hallucinated |
-| 5 | Ask a question the corpus does NOT answer | Confirms honest "not found" behavior, not fabrication |
-
-## F — Regression checklist
-
-Re-run categories A + B (minimum) after any change to:
-
-- The skillset (Document Layout / Split / Embedding skill configuration)
-- The index schema
-- The Knowledge Base configuration
-- The fallback MCP server code
-- The Azure AI Search API version referenced anywhere in this pattern (preview surfaces move fast — see [docs/06](./06-mcp-endpoint-and-fallback-server.md))
-
-## Test harness layout
-
-```
-tests/
-├── fixtures/
-│   └── sample.pdf                    # small public-domain test document (bring your own)
-├── test_post_deploy_search.py        # smoke tests for the ingestion/setup script
-└── test_mcp_fallback_server.py       # smoke tests for the fallback MCP server's retrieval helper
-```
-
-## When to re-run what
-
-| Trigger | Tests to run |
-|---|---|
-| First deployment | A, B, C, E |
-| Corpus updated (new/changed PDFs) | A, C |
-| Skillset/index schema change | A, B, F |
-| Search service tier or region change | A, D, F |
-| Before a customer-facing demo | E (dry run), spot-check C |
+> **The trap this test plan exists to avoid.** The first build of this pattern passed a 4/4
+> golden set and was declared working. Auditing the *content* of the index afterwards found
+> 27% of tables split mid-table, 36% of figures discarded as empty tags, and 41% of heading
+> citations pointing at the wrong section. **A golden set that only checks which document came
+> back cannot detect a degraded passage.** Category C tests retrieval; category B tests what
+> is actually in the index. You need both.
 
 ---
 
-*Last updated: 2026-08-18*
+## Test categories
+
+| # | Category | Answers | Automated |
+|---|---|---|---|
+| A | Functional | Did every resource deploy and connect? | partly |
+| B | **Chunk quality** | Is what landed in the index actually usable? | ✅ `compare_extraction_tiers.py --audit` |
+| C | Quality (golden set) | Does retrieval return the right source? | ✅ `compare_extraction_tiers.py --golden` |
+| D | **Tier provenance** | Are both tiers contributing? | ✅ facet query |
+| E | End-to-end demo script | Does the story land in front of a customer? | manual |
+| F | Regression checklist | Did a change break anything? | ✅ `pytest` |
+
+---
+
+## A — Functional tests
+
+| Check | How | Pass |
+|---|---|---|
+| Resources deployed | `az resource list -g <rg> -o table` | Storage, Foundry (+ project), Search, Key Vault all present |
+| Model deployments | `az cognitiveservices account deployment list -n <foundry> -g <rg> -o table` | `embedding`, `chat`, `sol`, `cu-frontier` |
+| Corpus routed | `python hybrid_ingest.py --ids-file ../demo-ids.local.json --plan --source-dir <dir>` | Each document shows a tier and a reason |
+| Blobs uploaded | Portal or `az storage blob list` | Files under `raw/cu/` and/or `raw/di/` |
+| Both indexers ran | `python hybrid_ingest.py --ids-file ../demo-ids.local.json --status` | Both `success`, 0 failed |
+| MCP endpoint | `python post_deploy_search.py --ids-file ../demo-ids.local.json --check-mcp-endpoint` | `Native MCP endpoint AVAILABLE.` |
+
+---
+
+## B — Chunk-quality audit (do not skip)
+
+```powershell
+cd scripts
+python compare_extraction_tiers.py --ids-file ../demo-ids.local.json --audit
+```
+
+Reports per tier: table integrity, figure handling, citation validity, and chunk-size
+distribution. Reference numbers from the validated build:
+
+| Metric | Tier CU | Tier DI+ | Why it matters |
+|---|---|---|---|
+| Tables intact | **100%** | ~77% before the vision skill | A split table loses its header row — the surviving cells lose all meaning |
+| Figures carrying text | native descriptions | **334 image-description rows** | An empty `<figure></figure>` means a diagram was detected and thrown away |
+| Citation validity | page range — structurally cannot misattribute | deepest heading only, never a path | A confidently wrong citation is worse than a coarse one |
+| Chunk size | 204–2,317 chars | tuned by `chunkSizeTokens` | Sub-300-char chunks are retrieval noise; 6,000+ char chunks bury the answer |
+
+**Fail conditions:** any chunk under ~100 characters in bulk, empty `<figure></figure>` tags
+in Tier DI+ output (means the vision skill did not run), or `sectionLabel`/`pageNumber*` empty
+across the board.
+
+---
+
+## C — Quality (golden set)
+
+Build 5–10 question/answer pairs from your own corpus, then:
+
+```powershell
+python compare_extraction_tiers.py --ids-file ../demo-ids.local.json --golden
+```
+
+Include at least one question of each kind:
+
+| Kind | Example | Proves |
+|---|---|---|
+| Prose lookup | *"What does the dmcontrol register control?"* | Basic retrieval |
+| Cross-document | a question answerable from only one of several documents | Correct routing, no bleed |
+| **Figure-only** | *"What is the bit width of the mtime register and which bits does it span?"* | **The vision/figure path works** — this is the one that fails silently without it |
+| Deep-section | something under a 4th- or 5th-level heading | Citation granularity |
+| Out-of-corpus | something the corpus genuinely does not cover | Honest "no relevant content" rather than a hallucination |
+
+**The figure-only question is the most valuable test in this document.** It is the one that
+distinguishes a working hybrid from a pipeline that quietly discarded every diagram.
+
+---
+
+## D — Tier provenance (is the hybrid actually hybrid?)
+
+A single unified index makes it easy to *assume* both tiers contributed. Verify it:
+
+```powershell
+$ak = az search admin-key show -g <rg> --service-name <search> --query primaryKey -o tsv
+$body = @{ search='*'; top=0; count=$true; facets=@('extractionTier','contentKind','sourceDocument') } | ConvertTo-Json
+Invoke-RestMethod -Uri "https://<search>.search.windows.net/indexes/idx-documents-hybrid/docs/search?api-version=2026-05-01-preview" `
+  -Method Post -Headers @{'api-key'=$ak;'Content-Type'='application/json'} -Body $body |
+  Select-Object -ExpandProperty '@search.facets'
+```
+
+| Check | Pass |
+|---|---|
+| `extractionTier` facet | One entry per tier you routed to — a missing tier means that indexer silently produced nothing |
+| `contentKind` facet | `image-description` rows present if any routed document has figures |
+| `sourceDocument` facet | **Every** document from `--plan` appears — a missing document is a rejected ingest, not a rounding error |
+
+Reference build: 4,109 rows — 3,882 `di-layout-verbalized`, 227 `content-understanding`, of
+which 334 `image-description`, across 2 of 2 documents.
+
+Then confirm a single query draws on **both** tiers:
+
+```powershell
+python compare_extraction_tiers.py --ids-file ../demo-ids.local.json --report
+```
+
+---
+
+## E — End-to-end demo script
+
+1. Show `--plan` — the routing decision, with the page-count reason per document. *"We don't
+   pick a service; we route per document, and the decision is free."*
+2. In VS Code agent mode, ask a prose question → grounded answer with a citation.
+3. Ask the **figure-only** question → the answer comes from a diagram the baseline pipeline
+   would have discarded. *This is the moment the pattern sells itself.*
+4. Show the `extractionTier` facet → both services contributed to one seamless corpus.
+5. Ask an out-of-corpus question → honest "no relevant content", not a hallucination.
+
+---
+
+## F — Regression checklist
+
+```powershell
+python -m pytest tests -q          # 52 tests
+az bicep build --file infra/main.bicep --stdout > $null
+```
+
+Run after any change to `scripts/`, `infra/`, or the index schema. The suite includes one
+regression test per defect class found during live builds — API-contract guards, harness
+methodology guards, and model-configuration guards.
+
+---
+
+## When to re-run what
+
+| Trigger | Re-run |
+|---|---|
+| Changed a skillset or index schema | B, C, D, F |
+| Added or changed corpus documents | A (routing), B, C, D |
+| Changed a model deployment | B (figure quality), C, F |
+| Upgraded the Search API version | A, D, F |
+| Before any customer demo | E, plus a smoke pass of A |
+
+---
+
+*Last updated: 2026-08-21*

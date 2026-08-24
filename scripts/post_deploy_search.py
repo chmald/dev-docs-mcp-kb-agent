@@ -26,6 +26,7 @@ Usage:
 """
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 
@@ -81,19 +82,61 @@ def save_ids(ids_file: str, ids: dict) -> None:
         json.dump(ids, f, indent=2)
 
 
+def _az_executable() -> str:
+    """Resolve the Azure CLI entry point.
+
+    On Windows the CLI ships as `az.cmd`, which `subprocess.run` cannot locate
+    from a bare "az" argument without a shell. `shutil.which` honours PATHEXT
+    and returns the real path on every platform."""
+    az = shutil.which("az")
+    if not az:
+        raise RuntimeError(
+            "Azure CLI ('az') was not found on PATH. Install it from "
+            "https://aka.ms/installazurecli and re-run."
+        )
+    return az
+
+
 def get_admin_key(ids: dict) -> str:
-    """Fetch the Search admin key from Key Vault via the az CLI (avoids adding
-    an azure-keyvault-secrets dependency for a single lookup)."""
-    result = subprocess.run(
+    """Fetch the Search admin key via the az CLI (avoids adding an
+    azure-keyvault-secrets dependency for a single lookup).
+
+    Primary source is the Key Vault secret written by infra/deploy.ps1. Some
+    governed subscriptions apply a policy that forces Key Vault
+    `publicNetworkAccess: Disabled`, which makes that lookup fail from a
+    developer workstation even with correct RBAC. In that case fall back to
+    reading the key straight off the Search service via the control plane,
+    which needs no data-plane access to the vault."""
+    kv_reason = "no 'keyVault' configured in the ids file"
+    if ids.get("keyVault"):
+        kv_result = subprocess.run(
+            [
+                _az_executable(), "keyvault", "secret", "show",
+                "--vault-name", ids["keyVault"],
+                "--name", ids.get("searchAdminKeySecretName", "search-admin-key"),
+                "--query", "value", "-o", "tsv",
+            ],
+            capture_output=True, text=True,
+        )
+        if kv_result.returncode == 0 and kv_result.stdout.strip():
+            return kv_result.stdout.strip()
+        stderr = kv_result.stderr.strip()
+        kv_reason = stderr.splitlines()[0] if stderr else "unknown"
+
+    print(
+        "  ! Key Vault lookup unavailable -- falling back to 'az search admin-key show'.\n"
+        f"    (Key Vault reason: {kv_reason})"
+    )
+    fallback = subprocess.run(
         [
-            "az", "keyvault", "secret", "show",
-            "--vault-name", ids["keyVault"],
-            "--name", ids.get("searchAdminKeySecretName", "search-admin-key"),
-            "--query", "value", "-o", "tsv",
+            _az_executable(), "search", "admin-key", "show",
+            "--resource-group", ids["resourceGroup"],
+            "--service-name", ids["searchService"],
+            "--query", "primaryKey", "-o", "tsv",
         ],
         capture_output=True, text=True, check=True,
     )
-    return result.stdout.strip()
+    return fallback.stdout.strip()
 
 
 def _storage_resource_id(ids: dict) -> str:
@@ -105,17 +148,45 @@ def _storage_resource_id(ids: dict) -> str:
 
 def _ai_services_subdomain_url(ids: dict) -> str:
     """Subdomain URL for the billable AI Services (Foundry) attachment on the
-    skillset. Prefer an explicit `aiServicesSubdomainUrl` in demo-ids.local.json;
-    otherwise fall back to the Document Intelligence endpoint, which is the same
-    multi-service account. If your Foundry resource exposes the newer
-    `https://<name>.services.ai.azure.com` form, set it explicitly."""
-    return ids.get("aiServicesSubdomainUrl") or ids["documentIntelligenceEndpoint"]
+    skillset.
+
+    IMPORTANT: for a `kind: AIServices` (Foundry) account, the Search API only
+    accepts the **AI Foundry** subdomain form
+    `https://<name>.services.ai.azure.com`. Passing the Document Intelligence /
+    FormRecognizer endpoint (`https://<name>.cognitiveservices.azure.com`) --
+    even though it is the same multi-service account, and is what the Bicep
+    `documentIntelligenceEndpoint` output and the Azure portal both show -- is
+    rejected with "'SubdomainUrl' parameter is not well-formed".
+
+    A trailing slash is also rejected, and both the Bicep output and the portal
+    render the endpoint *with* one, so normalise it here.
+
+    Resolution order: explicit `aiServicesSubdomainUrl` -> derived from
+    `foundryResource` -> `documentIntelligenceEndpoint` (last-resort legacy)."""
+    url = ids.get("aiServicesSubdomainUrl")
+    if not url and ids.get("foundryResource"):
+        url = f"https://{ids['foundryResource']}.services.ai.azure.com"
+    if not url:
+        url = ids["documentIntelligenceEndpoint"]
+    return url.rstrip("/")
 
 
 def search_request(method: str, path: str, ids: dict, admin_key: str, body: dict | None = None) -> requests.Response:
     url = f"{ids['searchEndpoint']}{path}?api-version={SEARCH_API_VERSION}"
     headers = {"api-key": admin_key, "Content-Type": "application/json"}
     return requests.request(method, url, headers=headers, json=body, timeout=60)
+
+
+def raise_with_detail(resp: requests.Response) -> None:
+    """`raise_for_status()` hides the Search API's response body, which is where
+    the actual reason for a 400 lives (bad field definition, unknown skill
+    property, wrong API version). Surface it before raising."""
+    if resp.status_code >= 400:
+        detail = resp.text.strip()
+        print(f"  ! {resp.status_code} {resp.reason} from {resp.request.method} {resp.url}")
+        if detail:
+            print(f"    {detail[:2000]}")
+    resp.raise_for_status()
 
 
 def create_data_source(ids: dict, admin_key: str) -> None:
@@ -129,7 +200,7 @@ def create_data_source(ids: dict, admin_key: str) -> None:
         "container": {"name": ids.get("rawContainer", "raw")},
     }
     resp = search_request("PUT", f"/datasources('{name}')", ids, admin_key, body)
-    resp.raise_for_status()
+    raise_with_detail(resp)
     print(f"Data source '{name}': {resp.status_code}")
 
 
@@ -215,7 +286,7 @@ def create_index(ids: dict, admin_key: str) -> None:
         },
     }
     resp = search_request("PUT", f"/indexes('{name}')", ids, admin_key, body)
-    resp.raise_for_status()
+    raise_with_detail(resp)
     print(f"Index '{name}': {resp.status_code}")
 
 
@@ -319,7 +390,7 @@ def create_skillset(ids: dict, admin_key: str) -> None:
         },
     }
     resp = search_request("PUT", f"/skillsets('{name}')", ids, admin_key, body)
-    resp.raise_for_status()
+    raise_with_detail(resp)
     print(f"Skillset '{name}': {resp.status_code}")
 
 
@@ -345,21 +416,21 @@ def create_indexer(ids: dict, admin_key: str) -> None:
         "outputFieldMappings": [],
     }
     resp = search_request("PUT", f"/indexers('{name}')", ids, admin_key, body)
-    resp.raise_for_status()
+    raise_with_detail(resp)
     print(f"Indexer '{name}': {resp.status_code}")
 
 
 def run_indexer(ids: dict, admin_key: str) -> None:
     name = ids.get("searchIndexerName", DEFAULT_INDEXER_NAME)
     resp = search_request("POST", f"/indexers('{name}')/search.run", ids, admin_key)
-    resp.raise_for_status()
+    raise_with_detail(resp)
     print(f"Indexer '{name}' run triggered.")
 
 
 def get_indexer_status(ids: dict, admin_key: str) -> None:
     name = ids.get("searchIndexerName", DEFAULT_INDEXER_NAME)
     resp = search_request("GET", f"/indexers('{name}')/search.status", ids, admin_key)
-    resp.raise_for_status()
+    raise_with_detail(resp)
     status = resp.json()
     last = status.get("lastResult", {}) or {}
     print(
@@ -400,7 +471,7 @@ def create_knowledge_source(ids: dict, admin_key: str) -> None:
         },
     }
     resp = search_request("PUT", f"/knowledgesources/{name}", ids, admin_key, body)
-    resp.raise_for_status()
+    raise_with_detail(resp)
     print(f"Knowledge Source '{name}': {resp.status_code}")
 
 
@@ -410,7 +481,22 @@ def create_knowledge_base(ids: dict, admin_key: str) -> None:
     NOTE: there is no `targetIndexes` property and no `defaultRerankerThreshold`
     on a knowledge base -- the index is reached through the knowledge source,
     and reranker threshold is a per-query option on the retrieve call.
-    `outputMode`/`retrievalReasoningEffort` require 2026-05-01-preview."""
+    `outputMode`/`retrievalReasoningEffort` require 2026-05-01-preview.
+
+    OUTPUT MODE -- this matters more than it looks. The native MCP tool
+    (`knowledge_base_retrieve`) accepts ONLY a `queries` array; it cannot pass
+    `includeReferenceSourceData`, so retrieval options must be set here on the
+    knowledge base. With `answerSynthesis`, the MCP path returns a single
+    gpt-5-mini-synthesised paragraph and, in practice, one that claims it
+    "cannot access external documents" -- the grounded passages never reach the
+    client. `extractiveData` returns the actual ranked passages with
+    `ref_id` / source document / heading path, which is what an MCP client
+    (GitHub Copilot) needs: Copilot does its own synthesis and citation, so
+    synthesising first is both lossy and redundant.
+
+    Override with `knowledgeBaseOutputMode` in demo-ids.local.json if you are
+    consuming the knowledge base from a non-LLM client that genuinely wants a
+    prose answer."""
     name = ids.get("knowledgeBaseName", DEFAULT_KNOWLEDGE_BASE_NAME)
     source_name = ids.get("knowledgeSourceName", DEFAULT_KNOWLEDGE_SOURCE_NAME)
     body = {
@@ -427,10 +513,10 @@ def create_knowledge_base(ids: dict, admin_key: str) -> None:
                 },
             }
         ],
-        "outputMode": "answerSynthesis",
+        "outputMode": ids.get("knowledgeBaseOutputMode", "extractiveData"),
     }
     resp = search_request("PUT", f"/knowledgebases/{name}", ids, admin_key, body)
-    resp.raise_for_status()
+    raise_with_detail(resp)
     print(f"Knowledge Base '{name}': {resp.status_code}")
 
 
@@ -455,8 +541,32 @@ def retrieve_body(ids: dict, query: str, reranker_threshold: float = 2.5) -> dic
 def test_retrieve(ids: dict, admin_key: str, query: str) -> None:
     name = ids.get("knowledgeBaseName", DEFAULT_KNOWLEDGE_BASE_NAME)
     resp = search_request("POST", f"/knowledgebases/{name}/retrieve", ids, admin_key, retrieve_body(ids, query))
-    resp.raise_for_status()
+    raise_with_detail(resp)
     print(json.dumps(resp.json(), indent=2))
+
+
+def _parse_mcp_response(resp: requests.Response) -> dict | None:
+    """The MCP Streamable HTTP transport replies with Server-Sent Events
+    (`Content-Type: text/event-stream`), not a bare JSON body -- each JSON-RPC
+    message arrives on a `data:` line. Calling `resp.json()` on that raises
+    "Expecting value: line 1 column 1", which previously made this script report
+    a working native endpoint as unavailable and push people to deploy the
+    fallback Container App for no reason.
+
+    Handles both transports: plain JSON and SSE."""
+    ctype = resp.headers.get("Content-Type", "")
+    if "text/event-stream" not in ctype:
+        try:
+            return resp.json()
+        except ValueError:
+            return None
+    for line in resp.text.splitlines():
+        if line.startswith("data:"):
+            try:
+                return json.loads(line[len("data:"):].strip())
+            except ValueError:
+                continue
+    return None
 
 
 def check_mcp_endpoint(ids: dict, admin_key: str, ids_file: str) -> None:
@@ -474,10 +584,18 @@ def check_mcp_endpoint(ids: dict, admin_key: str, ids_file: str) -> None:
             "clientInfo": {"name": "mcp-knowledge-base-setup-script", "version": "1.0"},
         },
     }
-    headers = {"api-key": admin_key, "Content-Type": "application/json"}
+    # The Streamable HTTP transport requires the client to advertise that it can
+    # accept an SSE stream; omitting text/event-stream gets a 406 from some
+    # server implementations.
+    headers = {
+        "api-key": admin_key,
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
+    }
     try:
         resp = requests.post(url, headers=headers, json=body, timeout=30)
-        if resp.status_code == 200 and "result" in resp.json():
+        payload = _parse_mcp_response(resp)
+        if resp.status_code == 200 and payload and "result" in payload:
             print("Native MCP endpoint AVAILABLE.")
             ids["mcpEndpointAvailability"] = "native"
         else:

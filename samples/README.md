@@ -32,7 +32,7 @@ cd ../scripts
 python upload_documents.py --ids-file ../demo-ids.local.json --source-dir "<path-to-your-documents>"
 ```
 
-See [`../docs/03-deployment.md` § Phase 2](../docs/03-deployment.md#phase-2--ingestion-data-source-skillset-index-indexer) for the full ingestion flow.
+See [`../docs/03-deployment.md` § Phase 2](../docs/03-deployment.md#phase-2--hybrid-ingestion) for the full ingestion flow.
 
 ## Building a golden test set
 
