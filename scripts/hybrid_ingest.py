@@ -675,11 +675,25 @@ def create_datasources_and_indexers(ids: dict, key: str) -> None:
             "dataSourceName": ds_name,
             "targetIndexName": n["index"],
             "skillsetName": skillset,
-            "parameters": {"batchSize": 1, "configuration": {
-                "dataToExtract": "contentAndMetadata",
-                "parsingMode": "default",
-                "allowSkillsetToReadFileData": True,
-            }},
+            # Tolerate a few failed documents instead of halting the whole run.
+            # Figure verbalization makes hundreds of vision calls, and transient
+            # upstream 500s are a normal occurrence at that volume. With the
+            # default (maxFailedItems: 0) a single transient failure stops the
+            # indexer, so every remaining document goes unprocessed -- observed
+            # live: one flaky document blocked four healthy ones for 45 minutes.
+            # A small non-zero budget keeps the run going; re-run without
+            # --reset afterwards to pick up whatever was skipped. Deliberately
+            # NOT -1 (unlimited), which would hide a genuinely broken corpus.
+            "parameters": {
+                "batchSize": 1,
+                "maxFailedItems": ids.get("maxFailedItems", 10),
+                "maxFailedItemsPerBatch": ids.get("maxFailedItemsPerBatch", 5),
+                "configuration": {
+                    "dataToExtract": "contentAndMetadata",
+                    "parsingMode": "default",
+                    "allowSkillsetToReadFileData": True,
+                },
+            },
         }
         r = _req("PUT", f"/indexers('{ixr_name}')", ids, key, ixr)
         pds.raise_with_detail(r)
