@@ -21,7 +21,7 @@ Common failure modes and fixes for the Developer Docs MCP Knowledge Base pattern
 | Knowledge Base `retrieve` call returns empty/low-quality results | Semantic ranker not enabled, or query planning model not deployed | § 3 |
 | Retrieval returns HTTP 429 `exceeded rate limit` | Chat deployment TPM too low for agentic retrieval | § 7 |
 | Vision skill fails: `did not execute within the time limit '00:00:30'` | **Request-rate throttling**, not model latency — deployment req/min ceiling below the concurrent burst | § 4 |
-| `Web Api skill response is invalid` + `upstream connect error` | Transient upstream failure in a long vision run — re-run without `--reset` | § 4 |
+| `Web Api skill response is invalid` + `upstream connect error` | Transient upstream failure in a long vision run — re-upload the failed blobs to retry them | § 4 |
 | MCP client gets "I cannot access external documents" instead of passages | Knowledge base `outputMode` is `answerSynthesis`; MCP needs `extractiveData` | § 3 |
 | MCP endpoint check reports "not available" but the endpoint works | SSE response parsed as JSON — fixed 2026-08-20 | § 4 |
 | MCP endpoint check returns 404 / `FeatureNotEnabled` | Native Knowledge Base MCP surface not available on this Search tier/region/API version | § 3, § 4 |
@@ -166,14 +166,38 @@ Fixes, in order of preference:
    figures in a single document.
 2. **Split oversized documents** so each ingestion produces a smaller concurrent burst — also
    what Content Understanding's 300-page limit requires, for an unrelated reason.
-3. Re-run without `--reset`; the indexer resumes from its checkpoint, so progress is not lost.
+3. Re-upload the failed blobs to retry just those documents (a plain re-run skips them — change tracking treats an attempted-and-failed document as seen).
 
 If capacity is already at the subscription quota ceiling (`InsufficientQuota` on the raise),
 splitting is the only remaining lever.
 
 **Symptom: `Web Api skill response is invalid` wrapping `InternalServerError: upstream connect error`.**
-Transient upstream failure during a long vision-heavy run. Re-run **without** `--reset` to
-resume. Repeated occurrences on a 900-page corpus are another argument for splitting.
+Transient upstream failure during a long vision-heavy run. Expected at volume — figure
+verbalization makes hundreds of vision calls per run.
+
+The indexers are created with `maxFailedItems: 10` so a flaky document does not halt the run;
+without that (the AI Search default is `0`) a single transient failure stops everything and
+every remaining document goes unprocessed.
+
+**To retry the failed documents, a plain re-run is NOT enough.** Blob change tracking treats an
+attempted-and-failed document as seen, so re-running the indexer reports
+`processed=0 failed=0` and skips them. Pick one:
+
+| Approach | Effect |
+|---|---|
+| **Re-upload just the failed blobs** (preferred) | Bumps `LastModified`, so change tracking picks up only those documents on the next run — no re-billing for the rest of the corpus |
+| `--reset` then run | Reprocesses the **entire** corpus and re-bills every page — only worth it if most documents failed |
+
+Identify the failed documents from the indexer status:
+
+```powershell
+$ak = az search admin-key show -g <rg> --service-name <search> --query primaryKey -o tsv
+(Invoke-RestMethod -Uri "https://<search>.search.windows.net/indexers/ixr-hybrid-cu/status?api-version=2026-05-01-preview" `
+  -Headers @{'api-key'=$ak}).lastResult.errors | ForEach-Object { $_.key }
+```
+
+Repeated failures on the same document usually mean it is too large — split it (see
+[08 § the hybrid tier](./08-extraction-tier-comparison.md#dont-choose--route-the-hybrid-tier)).
 
 ## 5 — GitHub Copilot / VS Code MCP client
 
