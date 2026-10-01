@@ -21,6 +21,25 @@ The pattern is intentionally low-code on the consumption side (zero custom UI, z
 
 ---
 
+## Pattern at a glance
+
+[![Reference architecture](./docs/assets/dev-docs-mcp-knowledge-agent-architecture.png)](./docs/assets/dev-docs-mcp-knowledge-agent-architecture.png)
+
+<sub>Editable source: [`docs/assets/dev-docs-mcp-knowledge-agent-architecture.drawio`](./docs/assets/dev-docs-mcp-knowledge-agent-architecture.drawio) — open in VS Code (draw.io extension) or app.diagrams.net. After editing, regenerate the PNG with `python scripts/export_diagrams.py docs/assets`.</sub>
+
+The pattern produces **two complementary outputs** from the same documents:
+
+| Output | Answers | Lives in | Doc |
+|---|---|---|---|
+| **Knowledge base + MCP endpoint** | *"Where in 2,000 pages is X?"* — cited passages, including text recovered from figures | Azure AI Search | [06](./docs/06-mcp-endpoint-and-fallback-server.md), [07](./docs/07-github-copilot-mcp-client-setup.md) |
+| **Repository export** | *"Show me section 3 with its diagrams"* — the document itself, page-cited, versioned with the code | Git | [10](./docs/10-repo-corpus-export.md) |
+
+And a scripted, self-checking customer demo ([docs/11](./docs/11-customer-walkthrough.md)) that proves both the prose path and the figure path before you present.
+
+> **Diagrams.** Every diagram in these docs is a PNG exported from a `.drawio` source that sits next to it in `docs/assets/` — the PNG renders everywhere (GitHub, Azure DevOps, VS Code, email, slides); the `.drawio` is what you edit. `python scripts/export_diagrams.py docs/assets --check` fails if a PNG is older than its source.
+
+---
+
 ## Locked design decisions
 
 These decisions are **the v1 baseline**. Deviate only with an explicit decision record and updated guidance.
@@ -59,10 +78,15 @@ All narrative documentation lives under `docs/`, in build order. The repo root h
 | docs/07-github-copilot-mcp-client-setup.md | Deep dive: wiring VS Code / GitHub Copilot to the MCP endpoint |
 | **docs/08-extraction-tier-comparison.md** | **The "why both services" doc** — DI-only vs CU-only vs hybrid, measured; the 300-page limit; figure verbalization; model selection; and the **cost model**. Read this before quoting a customer. |
 | **docs/09-findings-and-lessons.md** | **Every defect, constraint and gotcha** from two clean-room rebuilds, organised by symptom — including the errors whose messages point at the wrong cause, and corrections to guidance that proved wrong |
-| docs/assets/dev-docs-mcp-knowledge-agent-architecture.drawio | Presentation-ready architecture diagram (customer decks) |
+| **docs/10-repo-corpus-export.md** | **PDF → repository package**: page-cited Markdown sections, original figure images, Mermaid, and opt-in register/pin/electrical extraction. Index vs. export vs. both, compared |
+| **docs/11-customer-walkthrough.md** | **Scripted customer demo** with expected citations and pass/fail — rehearse with it, present with `--present` |
+| docs/assets/*.drawio + *.png | Diagram sources and their exported PNGs: reference architecture, hybrid routing, repository export, customer walkthrough. Embed the PNG; edit the `.drawio` |
 | infra/ | Bicep IaC (main template + modules) |
 | scripts/hybrid_ingest.py | **The production path** — page-count router, both ingestion tiers, unified index, knowledge base |
 | scripts/compare_extraction_tiers.py | Re-runnable A/B harness — audits chunk quality and retrieval per tier, emits a scorecard to `out/` |
+| scripts/export_repo_corpus.py | PDF → repository-committable corpus (analyze once, export offline) |
+| scripts/demo_walkthrough.py | Scripted customer walkthrough with expected citations; `--present` for the talk track |
+| scripts/export_diagrams.py | Re-exports every `docs/assets/*.drawio` to PNG via the draw.io desktop CLI; `--check` flags stale PNGs |
 | scripts/ | Remaining setup scripts + the optional wrapper MCP server |
 | tests/ | Smoke tests, API-contract guards, and harness methodology guards |
 | samples/ | Bring-your-own-corpus guidance |
@@ -75,7 +99,8 @@ All narrative documentation lives under `docs/`, in build order. The repo root h
 |---|---|
 | **Build it** | `docs/00` → `docs/07` in order. `docs/03b` is a complete Bicep-free alternative to `docs/03`; everything else applies to both paths unchanged. |
 | **Understand why it uses two services** | `docs/01` for the design, then **`docs/08`** for the measured justification and cost model |
-| **Sell it** | **`docs/08`** — DI-only vs CU-only vs hybrid, on real numbers |
+| **Sell it** | **`docs/08`** — DI-only vs CU-only vs hybrid, on real numbers — then rehearse with **`docs/11`** |
+| **Give developers the documents in their repo** | **`docs/10`** |
 | **Fix something** | `docs/05` (by symptom) and **`docs/09`** (every known defect and constraint) |
 
 ### Platform support
@@ -143,4 +168,4 @@ This folder is checked into Azure DevOps as a standalone repo. `.gitignore` excl
 
 ---
 
-*Last updated: 2026-08-24*
+*Last updated: 2026-09-30*

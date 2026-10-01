@@ -4,6 +4,41 @@ Change history for this pattern. Entries are listed newest-first.
 
 ---
 
+## 2026-09-30
+
+### Repository export, scripted walkthrough, oversized-upload guard, visuals (v1.1.0)
+
+Driven by a gap between what the pattern delivered and what the originating ask actually was:
+teams wanted vendor PDFs turned into **repository content** (Markdown, diagrams, image files)
+that coding assistants read from the working tree, not only a search index.
+
+| Change | Why |
+|---|---|
+| **New `scripts/export_repo_corpus.py`** + [docs/10](./docs/10-repo-corpus-export.md) | PDF → page-cited Markdown sections, original figure crops, AI-drafted Mermaid for flow/block/state diagrams, corpus + per-document READMEs with Mermaid visuals, `manifest.json` with source and file hashes, and a Copilot-instructions snippet. Analyze once (billable, cached by file hash), export offline as often as needed. Split parts are stitched back into one document with **original** page numbers |
+| **Opt-in structured extractors** (`corpus.exportExtractors`: `registers`, `pins`, `electrical`) | Register tables become JSON + a Mermaid bit-field diagram + a Markdown table; pin and electrical tables become JSON with parsed min/typ/max. Off by default so the pattern stays corpus-neutral; a reusability guard test enforces that generic output carries no hardware vocabulary |
+| **New `scripts/demo_walkthrough.py`** + `samples/walkthrough.example.json` + [docs/11](./docs/11-customer-walkthrough.md) | Section E of the test plan was manual. It is now a scripted, self-checking walkthrough with expected sources and content kinds (the figure step must be answered from an `image-description` row), a `--present` talk track that makes no Azure calls, and a Markdown report |
+| **`hybrid_ingest.py --upload` refuses oversized documents without `--split` or `--no-split`** | Routing a > 300-page manual to Tier DI+ is a quality and reliability decision (docs/09), so it must be explicit. `--plan` warns; `--upload` stops before uploading anything |
+| **Visuals** — four draw.io diagrams (reference architecture, hybrid routing, repository export, customer walkthrough) built on the Azure icon set, each committed as `.drawio` source **plus** an exported PNG that the docs embed; all hand-authored Mermaid removed from README and docs/01, 08, 10, 11; new `scripts/export_diagrams.py` re-exports PNGs via the draw.io desktop CLI and `--check` flags a PNG older than its source | Wider audiences grasp the design from a real architecture picture before reading prose, and a PNG renders identically in GitHub, Azure DevOps, VS Code, email and slides. The architecture diagram was also stale (single ingestion tier, `gpt-4o-mini`, "preview" MCP caveat) and now shows the hybrid tiers, model deployments and the repository-export lane |
+| **docs/04 § F** — install requirements before running tests; test count 52 → 80, with a per-file coverage table | Without the `mcp` SDK, `test_mcp_fallback_server.py` fails at *collection*, which reads like a broken suite |
+
+**Verified against current documentation (2026-09-30):** Document Intelligence v4.0 GA
+(`2024-11-30`) analyze path, `outputContentFormat=markdown`, `output=figures` and the
+`analyzeResults/{resultId}/figures/{figureId}` PNG endpoint; figure IDs follow an
+*undocumented* `{page}.{index}` convention (handled defensively); `stringIndexType` defaults to
+`textElements`, so the exporter sends `unicodeCodePoint` to keep offsets aligned with Python
+strings; S0 limits 2,000 pages / 500 MB (F0 analyzes only the first 2 pages); Entra auth scope
+`https://cognitiveservices.azure.com/.default` with **Cognitive Services User**; prebuilt-layout
+list price $10 / 1,000 pages, and figure output is not a billed add-on. Mermaid (used only in
+the exporter's *generated* output): the bit-field diagram's documented keyword is `packet`
+(v11.0+); `packet-beta` is still accepted and was kept for compatibility because GitHub does
+not publish its Mermaid version, and every generated diagram has a Markdown-table twin.
+
+Not yet exercised against a live Document Intelligence resource — the exporter's Azure calls
+are verified against the REST reference, and the offline stage is covered by tests. Run
+`--analyze` on the sample corpus before the first customer use.
+
+---
+
 ## 2026-08-24
 
 ### Cross-platform docs, consolidated findings reference (v1.0.9)

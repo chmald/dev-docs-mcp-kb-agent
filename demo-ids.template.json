@@ -7,7 +7,9 @@
     "scripts/upload_documents.py (reads storageAccount, rawContainer, corpus.sourceFileExtensions)",
     "scripts/post_deploy_search.py (reads searchEndpoint, searchAdminKeySecretName, foundryOpenAIEndpoint, embeddingDeployment, embeddingDimensions, documentIntelligenceEndpoint, storageAccount, rawContainer, searchIndexName, searchSkillsetName, searchDataSourceName, searchIndexerName, knowledgeBaseName, chatDeployment, corpus.*)",
     "scripts/mcp_fallback_server.py (reads searchEndpoint, searchIndexName, knowledgeBaseName, keyVaultUri)",
-    "scripts/deploy_mcp_server.ps1 (reads containerRegistry, containerAppsEnvironment, containerAppName, resourceGroup, corpus.mcpToolName, corpus.mcpToolDescription)"
+    "scripts/deploy_mcp_server.ps1 (reads containerRegistry, containerAppsEnvironment, containerAppName, resourceGroup, corpus.mcpToolName, corpus.mcpToolDescription)",
+    "scripts/export_repo_corpus.py (reads documentIntelligenceEndpoint, foundryOpenAIEndpoint, exportFigureDeployment|visionDeployment, chatApiVersion, corpus.displayName, corpus.exportExtractors)",
+    "scripts/demo_walkthrough.py (reads searchEndpoint, searchIndexName, keyVault|resourceGroup+searchService, walkthroughKnowledgeBase, walkthroughKnowledgeSource)"
   ],
 
   "corpus": {
@@ -17,7 +19,9 @@
     "mcpToolDescription": "Search the hardware datasheet and firmware reference documentation corpus and return grounded, cited passages. Use this for questions about register values, pin configuration, electrical characteristics, timing, and peripheral behavior. Each result cites its source document, page number, and section heading.",
     "chunkSizeTokens": 1500,
     "chunkOverlapTokens": 200,
-    "sourceFileExtensions": [".pdf"]
+    "sourceFileExtensions": [".pdf"],
+    "exportExtractors": ["registers", "pins", "electrical"],
+    "_exportExtractors_note": "Structured extractors for scripts/export_repo_corpus.py (docs/10). Hardware-specific by nature, so they are opt-in: set [] for any non-hardware corpus."
   },
 
   "tenantId": "<entra-tenant-guid>",

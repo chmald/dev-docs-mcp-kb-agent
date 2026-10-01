@@ -155,12 +155,18 @@ rights.
 ### 2.3 Upload into the tier prefixes
 
 ```bash
-python hybrid_ingest.py --ids-file ../demo-ids.local.json --upload --source-dir "<path-to-your-pdfs>"
+python hybrid_ingest.py --ids-file ../demo-ids.local.json --upload --split --source-dir "<path-to-your-pdfs>"
 ```
 
 Documents land under `raw/cu/` (≤ 300 pages) or `raw/di/` (> 300 pages). Each tier's data
 source scopes to its own folder — AI Search indexers cannot filter on page count, but they can
 scope to a prefix.
+
+| Flag | Oversized documents (> 300 pages) | Use when |
+|---|---|---|
+| `--split` | Split into page-ranged parts; every part goes to Tier CU | **Default choice** — best quality, and a failure costs one part instead of a whole manual |
+| `--no-split` | Kept whole; routed to Tier DI+ | Splitting is unacceptable (e.g. the document must stay one unit for audit) |
+| neither | `--upload` **stops before uploading anything** and lists the oversized files | — forces the choice to be deliberate |
 
 ### 2.4 Build both tiers and ingest
 
@@ -284,4 +290,4 @@ cd ../scripts
 
 ---
 
-*Last updated: 2026-08-24*
+*Last updated: 2026-09-30*

@@ -199,6 +199,28 @@ def print_plan(rows: list[dict]) -> None:
         print("  the whole corpus on the higher-quality tier (see docs/08 § options).")
 
 
+def oversized_guard(rows: list[dict], split: bool, no_split: bool, uploading: bool) -> None:
+    """Refuse to upload an oversized document unless the operator chose how to handle it.
+
+    An oversized PDF silently routed to Tier DI+ still works, but it forfeits
+    Content Understanding's quality AND concentrates hundreds of vision calls in
+    one document, where a single late failure discards the whole document's
+    enrichment (docs/09). That is a decision, not a default -- so make it explicit.
+    """
+    oversized = [r for r in rows if r["pages"] is not None and r["pages"] > CU_MAX_PAGES]
+    if not oversized or split or no_split:
+        return
+    names = ", ".join(f"{r['file']} ({r['pages']} pages)" for r in oversized)
+    msg = (f"\n  ! {len(oversized)} document(s) exceed Content Understanding's {CU_MAX_PAGES}-page limit: {names}\n"
+           "    Choose explicitly:\n"
+           "      --split     split into page-ranged parts (recommended: every part gets the CU tier, and a\n"
+           "                  failure costs one part instead of the whole document)\n"
+           "      --no-split  keep them whole and route to Document Layout + verbalization (Tier DI+)\n")
+    if uploading:
+        raise SystemExit(msg + "    Upload stopped -- nothing was uploaded.")
+    print(msg)
+
+
 def upload(ids: dict, rows: list[dict]) -> None:
     """Upload each document under the blob prefix its tier's data source scopes to."""
     from azure.core.exceptions import HttpResponseError
@@ -781,6 +803,9 @@ def main() -> None:
                         "discarding a whole document's enrichment.")
     p.add_argument("--split-dir", default=None,
                    help="Destination for split output (default: <source-dir>/../corpus-split)")
+    p.add_argument("--no-split", action="store_true",
+                   help="Explicitly keep documents over the 300-page limit whole and route them to Tier DI+. "
+                        "Without --split or --no-split, --upload refuses to upload an oversized document.")
     p.add_argument("--plan", action="store_true", help="Show the routing decision (no Azure calls, no cost)")
     p.add_argument("--upload", action="store_true", help="Upload documents into their tier's blob prefix")
     p.add_argument("--build", action="store_true", help="Create the unified index, both tiers, and the knowledge base")
@@ -789,6 +814,8 @@ def main() -> None:
     args = p.parse_args()
 
     ids = pds.load_ids(args.ids_file)
+    if args.split and args.no_split:
+        p.error("--split and --no-split are mutually exclusive")
 
     if args.plan or args.upload or args.split:
         if not args.source_dir:
@@ -802,6 +829,7 @@ def main() -> None:
             print()
         rows = plan(source)
         print_plan(rows)
+        oversized_guard(rows, args.split, args.no_split, uploading=args.upload)
         if args.upload:
             print()
             upload(ids, rows)

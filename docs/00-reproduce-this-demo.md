@@ -169,6 +169,11 @@ This is also the number you need for a cost estimate — see
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --upload --source-dir "<split-or-original-dir>"
 ```
 
+If the directory still contains a document over 300 pages, `--upload` **stops before uploading
+anything** and asks you to choose: re-run with `--split` (recommended) or `--no-split` (keep it
+whole on Tier DI+). Routing an oversized manual is a quality and reliability decision, so the
+script no longer makes it silently.
+
 **Checkpoint:** blobs appear under `raw/cu/` and/or `raw/di/`.
 
 ---
@@ -220,6 +225,26 @@ the source document — that is the whole pattern working end to end.
 
 ---
 
+## Part F — Rehearse, and optionally export to a repository
+
+```bash
+python demo_walkthrough.py --ids-file ../demo-ids.local.json --script ../samples/walkthrough.example.json --report
+```
+
+**Checkpoint:** `5/5 steps passed`. Full detail: [11-customer-walkthrough.md](./11-customer-walkthrough.md).
+
+Optional — if developers want the documents themselves in their repo
+([10-repo-corpus-export.md](./10-repo-corpus-export.md)):
+
+```bash
+python export_repo_corpus.py --ids-file ../demo-ids.local.json --analyze --source-dir "<split-or-original-dir>"
+python export_repo_corpus.py --ids-file ../demo-ids.local.json --export --out ../out/repo-export
+```
+
+**Checkpoint:** `out/repo-export/README.md` lists every document with section, figure and table counts.
+
+---
+
 ## Single-page checklist
 
 | Part | What | Done |
@@ -229,6 +254,7 @@ the source document — that is the whole pattern working end to end.
 | C | Build both tiers, ingest, confirm both indexers succeed | [ ] |
 | D | Verify retrieval + native MCP endpoint | [ ] |
 | E | Wire GitHub Copilot and ask a figure-only question | [ ] |
+| F | Walkthrough passes 5/5; *(optional)* repository export generated | [ ] |
 
 Then run [04-testing.md](./04-testing.md) before calling it demo-ready. If anything fails,
 [05-troubleshooting.md](./05-troubleshooting.md) is organised by symptom.
@@ -247,4 +273,4 @@ in use.
 
 ---
 
-*Last updated: 2026-08-24*
+*Last updated: 2026-09-30*

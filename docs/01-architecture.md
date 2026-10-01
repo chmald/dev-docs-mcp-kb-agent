@@ -55,52 +55,19 @@ Full measurements, the DI-only vs CU-only vs hybrid comparison, and cost:
 
 ## Architecture diagram
 
-> **Presentation-ready diagram**:
-> [`docs/assets/dev-docs-mcp-knowledge-agent-architecture.drawio`](./assets/dev-docs-mcp-knowledge-agent-architecture.drawio)
-> — the same view laid out for a customer deck. The Mermaid below is the same content in text
-> form, for quick reading and clean diffs.
+[![Reference architecture](./assets/dev-docs-mcp-knowledge-agent-architecture.png)](./assets/dev-docs-mcp-knowledge-agent-architecture.png)
 
-```mermaid
-flowchart TB
-    subgraph T1["Source"]
-        DOC["Technical document corpus (PDF)"]
-        PLAN["Router: page count per file\n(local metadata - free, no service call)"]
-    end
+<sub>Editable source: [`assets/dev-docs-mcp-knowledge-agent-architecture.drawio`](./assets/dev-docs-mcp-knowledge-agent-architecture.drawio) — open in VS Code (draw.io extension) or app.diagrams.net; regenerate the PNG with `python scripts/export_diagrams.py docs/assets`.</sub>
 
-    subgraph T2["Ingestion - two tiers, one index"]
-        BLOBCU[("Blob: raw/cu/\nup to 300 pages")]
-        BLOBDI[("Blob: raw/di/\nover 300 pages")]
-        SKCU["Tier CU skillset:\nContent Understanding\nsemantic chunking +\nfigure descriptions"]
-        SKDI["Tier DI+ skillset:\nDocument Layout + Split\n+ vision skill for\nfigure verbalization"]
-    end
-
-    subgraph T3["Platform"]
-        CU["Azure AI Content Understanding"]
-        DI["Azure AI Document Intelligence (Layout)"]
-        AOAI["Azure OpenAI\ntext-embedding-3-large\n+ frontier chat/vision models"]
-        IDX[("Unified AI Search index\ncontent + vector + provenance\nextractionTier / contentKind")]
-    end
-
-    subgraph T4["Retrieval / MCP surface"]
-        KB["AI Search Knowledge Base\nagentic retrieval, extractiveData"]
-        MCP["Native MCP endpoint\nPOST /knowledgebases/name/mcp"]
-    end
-
-    subgraph T5["Consumption"]
-        VSCODE["VS Code + GitHub Copilot\n.vscode/mcp.json, agent mode"]
-    end
-
-    DOC --> PLAN
-    PLAN -->|up to 300 pages| BLOBCU --> SKCU --> CU
-    PLAN -->|over 300 pages| BLOBDI --> SKDI --> DI
-    SKDI -->|figure images| AOAI
-    SKCU --> AOAI
-    SKCU --> IDX
-    SKDI --> IDX
-    IDX --> KB
-    KB -->|query planning| AOAI
-    KB --> MCP -->|Streamable HTTP| VSCODE
-```
+| Tier | Components | Role |
+|---|---|---|
+| 1 · Source | Technical PDFs; optional page-ranged split parts | Bring-your-own corpus; `--split` keeps original page numbers in part names |
+| 2 · Route & stage | `hybrid_ingest.py` router, Blob Storage (`raw/cu/`, `raw/di/`) | Page count decides the tier before any spend; blob prefix scopes each tier's data source |
+| 3 · Extraction & models | Content Understanding (Tier CU), Document Intelligence Layout (Tier DI+), model deployments in one Foundry account | Extraction + chunking; vision model verbalizes figures on both tiers; embedding + frontier models |
+| 4 · Retrieval | Unified AI Search index, knowledge base (`extractiveData`) | One corpus regardless of tier; agentic retrieval with query planning |
+| 5 · MCP surface | Native Knowledge Base MCP endpoint; optional wrapper on Container Apps; Key Vault | Zero-code MCP exposure; wrapper only for defense-in-depth |
+| 6 · Developer | VS Code + GitHub Copilot (agent mode); `demo_walkthrough.py` | Consumption; scripted demo verification |
+| Optional lane | `export_repo_corpus.py` → repository package → customer repo | The same documents committed next to the code ([10](./10-repo-corpus-export.md)) |
 
 ---
 
@@ -263,4 +230,4 @@ the cost. Run `--plan` against a real corpus before quoting anything.
 
 ---
 
-*Last updated: 2026-08-24*
+*Last updated: 2026-09-30*

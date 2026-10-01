@@ -20,7 +20,7 @@ earning their place**. Run these after [03-deployment.md](./03-deployment.md).
 | B | **Chunk quality** | Is what landed in the index actually usable? | ✅ `compare_extraction_tiers.py --audit` |
 | C | Quality (golden set) | Does retrieval return the right source? | ✅ `compare_extraction_tiers.py --golden` |
 | D | **Tier provenance** | Are both tiers contributing? | ✅ facet query |
-| E | End-to-end demo script | Does the story land in front of a customer? | manual |
+| E | End-to-end demo script | Does the story land in front of a customer? | ✅ `demo_walkthrough.py` |
 | F | Regression checklist | Did a change break anything? | ✅ `pytest` |
 
 ---
@@ -125,6 +125,14 @@ python compare_extraction_tiers.py --ids-file ../demo-ids.local.json --report
 
 ## E — End-to-end demo script
 
+Scripted and self-checking — see [11-customer-walkthrough.md](./11-customer-walkthrough.md):
+
+```bash
+python demo_walkthrough.py --ids-file ../demo-ids.local.json --script ../samples/walkthrough.example.json --report
+```
+
+The steps it runs, and what to say at each:
+
 1. Show `--plan` — the routing decision, with the page-count reason per document. *"We don't
    pick a service; we route per document, and the decision is free."*
 2. In VS Code agent mode, ask a prose question → grounded answer with a citation.
@@ -132,15 +140,31 @@ python compare_extraction_tiers.py --ids-file ../demo-ids.local.json --report
    would have discarded. *This is the moment the pattern sells itself.*
 4. Show the `extractionTier` facet → both services contributed to one seamless corpus.
 5. Ask an out-of-corpus question → honest "no relevant content", not a hallucination.
+6. *(Optional)* Open the repository export ([docs/10](./10-repo-corpus-export.md)) → the same
+   section as a page-cited Markdown file with the original figure and the register's bit-field
+   diagram, committed next to the code.
 
 ---
 
 ## F — Regression checklist
 
+Install the pinned requirements first. `tests/test_mcp_fallback_server.py` imports the `mcp`
+SDK, and without it pytest reports a **collection error** for that file, not a test failure:
+
 ```bash
-python -m pytest tests -q          # 52 tests
+pip install -r scripts/requirements.txt
+python -m pytest tests -q          # 80 tests, all offline
 az bicep build --file infra/main.bicep --stdout > $null
+python scripts/export_diagrams.py docs/assets --check   # every diagram PNG is newer than its .drawio
 ```
+
+| Test file | Covers |
+|---|---|
+| `test_post_deploy_search.py` | API-contract guards, reusability guards, model configuration |
+| `test_compare_extraction_tiers.py` | Harness methodology guards |
+| `test_mcp_fallback_server.py` | Optional MCP wrapper |
+| `test_export_repo_corpus.py` | Section splitting, page mapping across split parts, figure rewriting, register/pin/electrical extraction, manifest |
+| `test_demo_walkthrough.py` | Walkthrough pass/fail rules, both response shapes, and the oversized-upload guard |
 
 Run after any change to `scripts/`, `infra/`, or the index schema. The suite includes one
 regression test per defect class found during live builds — API-contract guards, harness
@@ -160,4 +184,4 @@ methodology guards, and model-configuration guards.
 
 ---
 
-*Last updated: 2026-08-24*
+*Last updated: 2026-09-30*

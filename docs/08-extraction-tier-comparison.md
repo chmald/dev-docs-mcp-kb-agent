@@ -195,32 +195,19 @@ If a meaningful share of the corpus exceeds 300 pages, you have three options:
 Neither tier wins outright, so the pattern ships a **router** rather than a default:
 [`scripts/hybrid_ingest.py`](../scripts/hybrid_ingest.py).
 
-```
-                      page count (free, local metadata)
-                                   │
-                ┌──────────────────┴──────────────────┐
-          ≤ 300 pages                            > 300 pages
-                │                                     │
-        ┌───────▼────────┐                   ┌────────▼─────────┐
-        │  Tier CU       │                   │  Tier DI+        │
-        │  Content       │                   │  DI Layout       │
-        │  Understanding │                   │  + Split         │
-        │  semantic      │                   │  + GenAI Prompt  │
-        │  chunking      │                   │    image         │
-        │                │                   │    verbalization │
-        └───────┬────────┘                   └────────┬─────────┘
-                └──────────────────┬──────────────────┘
-                                   ▼
-                    ONE unified index (extractionTier tag)
-                                   ▼
-                    ONE knowledge base → ONE MCP endpoint
-```
+[![Hybrid routing by page count](./assets/hybrid-routing.png)](./assets/hybrid-routing.png)
+
+<sub>Editable source: [`assets/hybrid-routing.drawio`](./assets/hybrid-routing.drawio).</sub>
 
 ```bash
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --plan   --source-dir ../samples/corpus
-python hybrid_ingest.py --ids-file ../demo-ids.local.json --upload --source-dir ../samples/corpus
+python hybrid_ingest.py --ids-file ../demo-ids.local.json --upload --no-split --source-dir ../samples/corpus
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --build
 ```
+
+`--no-split` is deliberate here — this example shows the two-tier routing. For a real build,
+prefer `--split` (see the options table above). Without either flag, `--upload` refuses to upload
+a document over 300 pages.
 
 `--plan` costs nothing and calls no service — page count is local metadata:
 
@@ -720,4 +707,4 @@ committing a customer to it.
 
 ---
 
-*Last updated: 2026-08-24*
+*Last updated: 2026-09-30*

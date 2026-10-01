@@ -1,0 +1,102 @@
+<mxfile host="Electron" version="26.0.0">
+  <diagram id="customer-walkthrough" name="Customer Walkthrough">
+    <mxGraphModel dx="1422" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="740" math="0" shadow="0" background="#FFFFFF">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Customer walkthrough — five steps, each with an expected citation" vertex="1" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;fontColor=#323130;">
+          <mxGeometry x="20" y="10" width="1660" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="Rehearse with demo_walkthrough.py (pass/fail + report), present with --present (talk track, no Azure calls)." vertex="1" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=14;fontStyle=2;fontColor=#605E5C;">
+          <mxGeometry x="20" y="50" width="1660" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="s0" value="&lt;font style='font-size:15px'&gt;&lt;b&gt;1 · Prose lookup&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;i&gt;proves&lt;/i&gt;&lt;br&gt;grounded retrieval&lt;br&gt;&lt;br&gt;&lt;i&gt;passes when&lt;/i&gt;&lt;br&gt;expected document&lt;br&gt;in the top 3, as text" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3F9FD;strokeColor=#0078D4;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="20" y="100" width="300" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="s1" value="&lt;font style='font-size:15px'&gt;&lt;b&gt;2 · Cross-document&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;i&gt;proves&lt;/i&gt;&lt;br&gt;no bleed between manuals&lt;br&gt;&lt;br&gt;&lt;i&gt;passes when&lt;/i&gt;&lt;br&gt;expected document&lt;br&gt;in the top 3" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3F9FD;strokeColor=#0078D4;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="354" y="100" width="300" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="se1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#605E5C;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="s0" target="s1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s2" value="&lt;font style='font-size:15px'&gt;&lt;b&gt;3 · Figure-only answer ★&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;i&gt;proves&lt;/i&gt;&lt;br&gt;the vision path works —&lt;br&gt;&lt;b&gt;the moment it sells itself&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;i&gt;passes when&lt;/i&gt;&lt;br&gt;an image-description row&lt;br&gt;from the expected document" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DFF6DD;strokeColor=#107C10;strokeWidth=3;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="688" y="100" width="300" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="se2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#605E5C;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="s1" target="s2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" value="&lt;font style='font-size:15px'&gt;&lt;b&gt;4 · Deep section&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;i&gt;proves&lt;/i&gt;&lt;br&gt;citation granularity&lt;br&gt;&lt;br&gt;&lt;i&gt;passes when&lt;/i&gt;&lt;br&gt;expected document&lt;br&gt;in the top 3" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3F9FD;strokeColor=#0078D4;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="1022" y="100" width="300" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="se3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#605E5C;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="s2" target="s3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="s4" value="&lt;font style='font-size:15px'&gt;&lt;b&gt;5 · Out of corpus&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;i&gt;proves&lt;/i&gt;&lt;br&gt;no hallucinated answer&lt;br&gt;&lt;br&gt;&lt;i&gt;passes when&lt;/i&gt;&lt;br&gt;&lt;b&gt;no&lt;/b&gt; references&lt;br&gt;returned" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FDE7E9;strokeColor=#A4262C;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="1356" y="100" width="300" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="se4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#605E5C;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="s3" target="s4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="run" value="How a rehearsal run works" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#605E5C;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontStyle=1;fontSize=14;fontColor=#605E5C;spacingTop=8;">
+          <mxGeometry x="20" y="340" width="1660" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="script" value="✅ &lt;b&gt;demo_walkthrough.py&lt;/b&gt;&lt;br&gt;--script walkthrough.json&lt;br&gt;--ids-file · --report" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#107C10;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="50" y="410" width="210" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="kb" value="&lt;b&gt;kb-hybrid&lt;/b&gt;&lt;br&gt;retrieve per step" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=2;fontSize=12;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=60;spacingRight=6;image=img/lib/azure2/app_services/Search_Services.svg;imageWidth=40;imageHeight=40;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="320" y="410" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="eval" value="&lt;b&gt;Evaluate&lt;/b&gt;&lt;br&gt;expectSource (split parts&lt;br&gt;still match) · expectKind&lt;br&gt;· expectNone" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF4CE;strokeColor=#B7791F;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="580" y="400" width="230" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="pass" value="✅ &lt;b&gt;N/N passed&lt;/b&gt;&lt;br&gt;Markdown report in out/&lt;br&gt;citations + snippets per step" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DFF6DD;strokeColor=#107C10;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="880" y="380" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="fail" value="❌ &lt;b&gt;Any step fails&lt;/b&gt;&lt;br&gt;exit code 1 — usable as&lt;br&gt;a pipeline gate" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FDE7E9;strokeColor=#A4262C;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="880" y="480" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="present" value="🎤 &lt;b&gt;--present&lt;/b&gt;&lt;br&gt;SAY · ASK · EXPECT per step&lt;br&gt;no Azure calls — safe on a screen share" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0078D4;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;dashed=1;">
+          <mxGeometry x="1250" y="410" width="290" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="w1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#5C2D91;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="script" target="kb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="w1_lbl" value="query" vertex="1" connectable="0" parent="w1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontColor=#5C2D91;labelBackgroundColor=#ffffff;">
+          <mxGeometry x="0.0" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="w2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#5C2D91;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="kb" target="eval">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="w2_lbl" value="refs" vertex="1" connectable="0" parent="w2" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontColor=#5C2D91;labelBackgroundColor=#ffffff;">
+          <mxGeometry x="0.0" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="w3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#107C10;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="eval" target="pass">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="w4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#A4262C;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="eval" target="fail">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="w5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#0078D4;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="script" target="present">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="155" y="590" />
+              <mxPoint x="1395" y="590" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="w5_lbl" value="same walkthrough file" vertex="1" connectable="0" parent="w5" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontColor=#0078D4;labelBackgroundColor=#ffffff;">
+          <mxGeometry x="0.3" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tip" value="&lt;b&gt;Rehearse step 3.&lt;/b&gt; A pipeline that silently discarded every diagram still passes steps 1, 2 and 4 — only the figure-only question proves the whole pattern works." vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1FAF1;strokeColor=#107C10;strokeWidth=1;fontSize=13;fontColor=#323130;align=left;verticalAlign=top;arcSize=4;spacing=10;">
+          <mxGeometry x="20" y="650" width="1660" height="60" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
