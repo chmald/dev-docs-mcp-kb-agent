@@ -1,0 +1,105 @@
+<mxfile host="Electron" version="26.0.0">
+  <diagram id="azd-up" name="azd up">
+    <mxGraphModel dx="1422" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="730" math="0" shadow="0" background="#FFFFFF">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="One command — azd up" vertex="1" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;fontColor=#323130;">
+          <mxGeometry x="20" y="10" width="1660" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="azd provisions infra/azd.bicep (resource group + the same main.bicep every other path uses) and runs two hooks. Configuration comes from the azd environment; see docs/12 for every variable." vertex="1" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=14;fontStyle=2;fontColor=#605E5C;">
+          <mxGeometry x="20" y="50" width="1660" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="cfg" value="⚙ &lt;b&gt;azd env set …&lt;/b&gt;&lt;br&gt;AZURE_LOCATION · AZURE_SUBSCRIPTION_ID&lt;br&gt;AZURE_TENANT_ID · optional overrides&lt;br&gt;→ .azure/&amp;lt;env&amp;gt;/.env" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#605E5C;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;dashed=1;">
+          <mxGeometry x="20" y="120" width="280" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="auth" value="🔐 &lt;b&gt;azd auth login&lt;/b&gt;&lt;br&gt;--tenant-id &amp;lt;demo tenant&amp;gt;&lt;br&gt;+ az login --tenant (hooks use az)" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF4CE;strokeColor=#B7791F;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="20" y="300" width="280" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="up" value="▶ &lt;b&gt;azd up&lt;/b&gt;" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DFF6DD;strokeColor=#107C10;strokeWidth=3;fontSize=16;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="360" y="210" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="hooks1" value="preprovision hook" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#FFFBEB;strokeColor=#B7791F;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontStyle=1;fontSize=14;fontColor=#B7791F;spacingTop=8;">
+          <mxGeometry x="570" y="100" width="330" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="h1a" value="&lt;b&gt;Tenant guard&lt;/b&gt;&lt;br&gt;az account == azd env&lt;br&gt;(subscription + tenant) or stop" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#B7791F;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="590" y="150" width="290" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="h1b" value="&lt;b&gt;Soft-delete guard&lt;/b&gt;&lt;br&gt;soft-deleted Foundry account?&lt;br&gt;purge if DEMO_PURGE_SOFT_DELETED=true,&lt;br&gt;else stop with the command" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#B7791F;strokeWidth=2;fontSize=11;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="590" y="260" width="290" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="prov" value="provision — infra/azd.bicep" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#F3F9FD;strokeColor=#0078D4;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontStyle=1;fontSize=14;fontColor=#0078D4;spacingTop=8;">
+          <mxGeometry x="940" y="100" width="340" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="rgx" value="&lt;b&gt;Resource group&lt;/b&gt;&lt;br&gt;rg-ddmcp-&amp;lt;env&amp;gt;-&amp;lt;region&amp;gt;&lt;br&gt;(or AZURE_RESOURCE_GROUP)" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#0078D4;strokeWidth=2;fontSize=11;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=60;spacingRight=6;image=img/lib/azure2/general/Resource_Groups.svg;imageWidth=40;imageHeight=40;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="960" y="150" width="300" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="mainb" value="&lt;b&gt;main.bicep&lt;/b&gt; (shared)&lt;br&gt;Storage · Foundry + project ·&lt;br&gt;4 model deployments · AI Search ·&lt;br&gt;Key Vault · RBAC · optional Container App" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0078D4;strokeWidth=2;fontSize=11;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="960" y="260" width="300" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="hooks2" value="postprovision hook" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#F1FAF1;strokeColor=#107C10;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontStyle=1;fontSize=14;fontColor=#107C10;spacingTop=8;">
+          <mxGeometry x="1320" y="100" width="360" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="h2a" value="🗂 &lt;b&gt;Write demo-ids.local.json&lt;/b&gt;&lt;br&gt;from the Bicep outputs" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#107C10;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="1340" y="150" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="h2b" value="🔑 &lt;b&gt;Store search admin key&lt;/b&gt;&lt;br&gt;in Key Vault (falls back if policy blocks)" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#107C10;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="1340" y="235" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="h2c" value="📥 &lt;b&gt;Optional ingest&lt;/b&gt;&lt;br&gt;DEMO_CORPUS_DIR set → split · upload · build" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#107C10;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;dashed=1;">
+          <mxGeometry x="1340" y="320" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#605E5C;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" parent="1" source="cfg" target="up">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#B7791F;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;" edge="1" parent="1" source="auth" target="up">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#107C10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="up" target="hooks1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#0078D4;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="hooks1" target="prov">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#107C10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="prov" target="hooks2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a5_lbl" value="outputs → env" vertex="1" connectable="0" parent="a5" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontColor=#107C10;labelBackgroundColor=#ffffff;">
+          <mxGeometry x="0.0" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#0078D4;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="rgx" target="mainb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="after" value="Then" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#605E5C;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontStyle=1;fontSize=14;fontColor=#605E5C;spacingTop=8;">
+          <mxGeometry x="20" y="450" width="1660" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="n0" value="&lt;b&gt;Ingest&lt;/b&gt; (if not done by the hook)&lt;br&gt;hybrid_ingest.py --split --upload --build" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=2;fontSize=11;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="50" y="500" width="370" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="n1" value="&lt;b&gt;Wire Copilot&lt;/b&gt;&lt;br&gt;.vscode/mcp.json → kb-hybrid MCP endpoint" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0078D4;strokeWidth=2;fontSize=11;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="460" y="500" width="370" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ne1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#605E5C;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n0" target="n1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n2" value="&lt;b&gt;Rehearse&lt;/b&gt;&lt;br&gt;demo_walkthrough.py --report → 5/5" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#107C10;strokeWidth=2;fontSize=11;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="870" y="500" width="370" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ne2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#605E5C;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n1" target="n2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3" value="&lt;b&gt;Tear down&lt;/b&gt;&lt;br&gt;azd down --purge (removes soft-deleted&lt;br&gt;Foundry + Key Vault too)" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#A4262C;strokeWidth=2;fontSize=11;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="1280" y="500" width="370" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ne3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#605E5C;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2" target="n3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="same" value="&lt;b&gt;Same resources, three ways.&lt;/b&gt; azd up, infra/deploy.ps1 and the manual Portal path (docs/03b) all deploy main.bicep's resources with the same names, so every later doc applies unchanged. azd is the fast path; deploy.ps1 suits an existing resource group; 03b suits customers who cannot run IaC." vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFBEB;strokeColor=#B7791F;strokeWidth=1;fontSize=13;fontColor=#323130;align=left;verticalAlign=top;arcSize=4;spacing=10;">
+          <mxGeometry x="20" y="630" width="1660" height="70" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

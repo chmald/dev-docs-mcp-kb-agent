@@ -6,6 +6,10 @@ Common failure modes and fixes for the Developer Docs MCP Knowledge Base pattern
 
 | Symptom | Most likely root cause | Section |
 |---|---|---|
+| `[preprovision] azd environment name … must be 1-12 lowercase letters/digits` | The env name becomes part of Storage/Key Vault/Foundry names | § 1a |
+| `[preprovision] The Azure CLI is on a different subscription than the azd environment` | `azd` and `az` keep separate logins; the hooks and scripts use `az` | § 1a |
+| `azd up` fails with `FlagMustBeSetForRestore` / preprovision reports a soft-deleted Foundry account | A previous `azd down` without `--purge` (or a deleted RG) left it soft-deleted | § 1a |
+| `[postprovision] Bicep outputs are missing` | Hook run outside `azd` or before a successful provision | § 1a |
 | Bicep deploy prints "Deployment complete" but nothing was created | Fixed 2026-08-20 — `deploy.ps1` used to ignore `az` failure. Re-pull the pattern if your copy predates that | § 1 |
 | Bicep deploy fails: AI Search `InsufficientResourcesAvailable` | The region is out of AI Search capacity — try another region | § 1 |
 | Corpus upload fails: `AuthorizationFailure` / "blocked by network rules" | Governed subscription forces `publicNetworkAccess: Disabled` on Storage | § 1 |
@@ -31,6 +35,20 @@ Common failure modes and fixes for the Developer Docs MCP Knowledge Base pattern
 | VS Code doesn't show the MCP server as connected | `.vscode/mcp.json` syntax error, wrong endpoint URL, or auth header missing | § 5 |
 | Copilot Chat never calls the tool | Tool description too vague, or GitHub Copilot's agent mode / MCP support not enabled | § 5 |
 | Answers cite the wrong page or fabricate content | Chunking split a table/definition across chunks, or golden-set threshold not yet tuned | § 6 |
+
+---
+
+## 1a — azd up
+
+| Symptom | Fix |
+|---|---|
+| Environment-name guard fails | `azd env new <name>` with 1–12 lowercase letters/digits (e.g. `dev`, `demo1`); select it with `azd env select <name>` |
+| Subscription/tenant guard fails | `az login --tenant <id>` then `az account set --subscription <id>` so `az` matches `AZURE_SUBSCRIPTION_ID` / `AZURE_TENANT_ID`; `azd auth login --tenant-id <id>` for azd itself |
+| Soft-deleted Foundry account | `azd env set DEMO_PURGE_SOFT_DELETED true` and re-run, or purge with the printed command. Next time tear down with `azd down --purge` |
+| Model deployment fails (`InsufficientQuota`, `DeploymentModelNotSupported`) | Lower `VISION_CAPACITY` / `FRONTIER_CAPACITY`, pick a region with quota, or override `*_MODEL_NAME` / `*_MODEL_VERSION` ([12 § 1.3](./12-configuration-reference.md#13-models)). `DEPLOY_HYBRID_MODELS=false` skips the two frontier models |
+| Bool/int parameter rejected | Values in `infra/azd.parameters.json` must stay quoted (`"${VAR=default}"`) — azd parses the JSON before substituting |
+| `demo-ids.local.json` stale after a re-provision | `azd hooks run postprovision` rewrites it from the current outputs |
+| Ingestion in the hook can't import packages | Set `DEMO_PYTHON` to your virtual environment's interpreter |
 
 ---
 

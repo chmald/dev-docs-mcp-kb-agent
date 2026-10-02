@@ -37,6 +37,39 @@ param embeddingModelName string = 'text-embedding-3-large'
 @description('Chat model to deploy for Knowledge Base query planning')
 param chatModelName string = 'gpt-5-mini'
 
+@description('Embedding model version')
+param embeddingModelVersion string = '1'
+
+@description('Chat model version')
+param chatModelVersion string = '2025-08-07'
+
+@description('Embedding deployment capacity (thousands of TPM)')
+param embeddingCapacity int = 30
+
+@description('Chat deployment capacity (thousands of TPM)')
+param chatCapacity int = 150
+
+@description('Deploy the vision + frontier models the hybrid ingestion path needs')
+param deployHybridModels bool = true
+
+@description('Vision model (figure verbalization, both tiers) -- non-reasoning on purpose')
+param visionModelName string = 'gpt-4.1'
+
+@description('Vision model version')
+param visionModelVersion string = '2025-04-14'
+
+@description('Vision deployment capacity (thousands of TPM) -- a reliability setting, see docs/12')
+param visionCapacity int = 1000
+
+@description('Frontier model (knowledge-base query planning)')
+param frontierModelName string = 'gpt-5.6-sol'
+
+@description('Frontier model version')
+param frontierModelVersion string = '2026-07-09'
+
+@description('Frontier deployment capacity (thousands of TPM)')
+param frontierCapacity int = 200
+
 var suffix = '${workload}-${environment}-${location}'
 var tags = {
   workload: workload
@@ -70,6 +103,17 @@ module foundry 'modules/foundry.bicep' = {
     tags: tags
     embeddingModelName: embeddingModelName
     chatModelName: chatModelName
+    embeddingModelVersion: embeddingModelVersion
+    chatModelVersion: chatModelVersion
+    embeddingCapacity: embeddingCapacity
+    chatCapacity: chatCapacity
+    deployHybridModels: deployHybridModels
+    visionModelName: visionModelName
+    visionModelVersion: visionModelVersion
+    visionCapacity: visionCapacity
+    frontierModelName: frontierModelName
+    frontierModelVersion: frontierModelVersion
+    frontierCapacity: frontierCapacity
   }
 }
 
@@ -132,6 +176,11 @@ output deploymentSummary object = {
   foundryProject: foundry.outputs.foundryProjectName
   embeddingDeployment: foundry.outputs.embeddingDeploymentName
   chatDeployment: foundry.outputs.chatDeploymentName
+  visionDeployment: foundry.outputs.visionDeploymentName
+  visionModel: foundry.outputs.visionModelName
+  frontierDeployment: foundry.outputs.frontierDeploymentName
+  frontierModel: foundry.outputs.frontierModelName
+  hybridModelsDeployed: foundry.outputs.hybridModelsDeployed
   searchService: search.outputs.searchServiceName
   searchEndpoint: search.outputs.searchEndpoint
   searchPrincipalId: search.outputs.principalId

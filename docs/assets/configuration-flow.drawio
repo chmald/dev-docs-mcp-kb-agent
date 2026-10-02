@@ -1,0 +1,125 @@
+<mxfile host="Electron" version="26.0.0">
+  <diagram id="configuration-flow" name="Configuration Flow">
+    <mxGraphModel dx="1422" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="700" math="0" shadow="0" background="#FFFFFF">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Where configuration lives — and how it reaches each component" vertex="1" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;fontColor=#323130;">
+          <mxGeometry x="20" y="10" width="1660" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="Set values once at the left; everything to the right is derived. Secrets never pass through any of these files." vertex="1" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=14;fontStyle=2;fontColor=#605E5C;">
+          <mxGeometry x="20" y="50" width="1660" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="c1" value="1 · You set" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#FAF9F8;strokeColor=#605E5C;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontStyle=1;fontSize=14;fontColor=#605E5C;spacingTop=8;">
+          <mxGeometry x="20" y="100" width="380" height="470" as="geometry" />
+        </mxCell>
+        <mxCell id="azdenv" value="⚙ &lt;b&gt;azd environment&lt;/b&gt;&lt;br&gt;azd env set NAME value&lt;br&gt;→ .azure/&amp;lt;env&amp;gt;/.env (gitignored)&lt;br&gt;&lt;i&gt;AZURE_*, model, capacity, DEMO_* knobs&lt;/i&gt;" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1FAF1;strokeColor=#107C10;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="40" y="150" width="340" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="ps1" value="⚡ &lt;b&gt;deploy.ps1 parameters&lt;/b&gt;&lt;br&gt;-Environment -Region -ResourceGroup&lt;br&gt;(+ infra/main.parameters.json)" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0078D4;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="40" y="290" width="340" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="corpus" value="📚 &lt;b&gt;corpus block&lt;/b&gt;&lt;br&gt;in demo-ids.local.json — the ONLY&lt;br&gt;corpus-specific settings" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF4CE;strokeColor=#B7791F;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="40" y="410" width="340" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="c2" value="2 · Infrastructure" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#F3F9FD;strokeColor=#0078D4;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontStyle=1;fontSize=14;fontColor=#0078D4;spacingTop=8;">
+          <mxGeometry x="440" y="100" width="400" height="470" as="geometry" />
+        </mxCell>
+        <mxCell id="params" value="&lt;b&gt;infra/azd.parameters.json&lt;/b&gt;&lt;br&gt;${VAR=default} substitution" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0078D4;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="460" y="150" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="bicep" value="&lt;b&gt;infra/azd.bicep → main.bicep&lt;/b&gt;&lt;br&gt;resource group · Storage · Foundry ·&lt;br&gt;4 models · AI Search · Key Vault" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0078D4;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="460" y="280" width="360" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="outs" value="&lt;b&gt;Bicep outputs&lt;/b&gt;&lt;br&gt;SEARCH_ENDPOINT, VISION_DEPLOYMENT, …&lt;br&gt;written back to the azd environment" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0078D4;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="460" y="430" width="360" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="c3" value="3 · Scripts read" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#F7F3FB;strokeColor=#5C2D91;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontStyle=1;fontSize=14;fontColor=#5C2D91;spacingTop=8;">
+          <mxGeometry x="880" y="100" width="400" height="470" as="geometry" />
+        </mxCell>
+        <mxCell id="ids" value="🗂 &lt;b&gt;demo-ids.local.json&lt;/b&gt;&lt;br&gt;written by postprovision / deploy.ps1&lt;br&gt;+ optional tunables you add by hand" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F7F3FB;strokeColor=#5C2D91;strokeWidth=3;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="900" y="150" width="360" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="py" value="⚡ &lt;b&gt;scripts/*.py --ids-file&lt;/b&gt;&lt;br&gt;hybrid_ingest · export_repo_corpus ·&lt;br&gt;demo_walkthrough · compare · post_deploy" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="900" y="300" width="360" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="mcpenv" value="&lt;b&gt;Fallback MCP server&lt;/b&gt;&lt;br&gt;Container App env vars&lt;br&gt;SEARCH_*, MCP_TOOL_*" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;dashed=1;">
+          <mxGeometry x="900" y="450" width="360" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="c4" value="4 · Secrets (never in files)" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#FDF3F4;strokeColor=#A4262C;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontStyle=1;fontSize=14;fontColor=#A4262C;spacingTop=8;">
+          <mxGeometry x="1320" y="100" width="360" height="470" as="geometry" />
+        </mxCell>
+        <mxCell id="kv" value="&lt;b&gt;Key Vault&lt;/b&gt;&lt;br&gt;search-admin-key" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#A4262C;strokeWidth=2;fontSize=12;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=60;spacingRight=6;image=img/lib/azure2/security/Key_Vaults.svg;imageWidth=40;imageHeight=40;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="1340" y="150" width="320" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="azlogin" value="🔐 &lt;b&gt;az / azd login&lt;/b&gt;&lt;br&gt;Entra tokens for Storage, Foundry,&lt;br&gt;Document Intelligence (no keys)" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#A4262C;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="1340" y="280" width="320" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="never" value="&lt;b&gt;Never&lt;/b&gt;&lt;br&gt;keys in .env, demo-ids, azure.yaml&lt;br&gt;or committed files" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FDE7E9;strokeColor=#A4262C;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="1340" y="430" width="320" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="f1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#107C10;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="azdenv" target="params">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#0078D4;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="params" target="bicep">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#0078D4;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="ps1" target="bicep">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#0078D4;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="bicep" target="outs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#5C2D91;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="outs" target="ids">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="860" y="475" />
+              <mxPoint x="860" y="200" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f5_lbl" value="postprovision&lt;br&gt;hook" vertex="1" connectable="0" parent="f5" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontColor=#5C2D91;labelBackgroundColor=#ffffff;">
+          <mxGeometry x="0.0" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#B7791F;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.85;entryDx=0;entryDy=0;" edge="1" parent="1" source="corpus" target="ids">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="210" y="585" />
+              <mxPoint x="890" y="585" />
+              <mxPoint x="890" y="235" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#5C2D91;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="ids" target="py">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#A4262C;dashed=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.3;entryDx=0;entryDy=0;" edge="1" parent="1" source="kv" target="py">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1300" y="190" />
+              <mxPoint x="1300" y="330" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f8_lbl" value="admin key" vertex="1" connectable="0" parent="f8" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontColor=#A4262C;labelBackgroundColor=#ffffff;">
+          <mxGeometry x="0.0" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#A4262C;dashed=1;exitX=0;exitY=0.6;exitDx=0;exitDy=0;entryX=1;entryY=0.7;entryDx=0;entryDy=0;" edge="1" parent="1" source="azlogin" target="py">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1290" y="340" />
+              <mxPoint x="1290" y="370" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="rule" value="&lt;b&gt;Precedence.&lt;/b&gt; azd environment value → its default in azd.parameters.json → the Bicep default. Script tunables: demo-ids.local.json key → the default in code. CLI flags (e.g. --split, --extract) override both for that run. Every variable, default and consumer is listed in docs/12." vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFBEB;strokeColor=#B7791F;strokeWidth=1;fontSize=13;fontColor=#323130;align=left;verticalAlign=top;arcSize=4;spacing=10;">
+          <mxGeometry x="20" y="600" width="1660" height="70" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -6,6 +6,33 @@ Change history for this pattern. Entries are listed newest-first.
 
 ## 2026-09-30
 
+### One-command `azd up`, configuration reference, all visuals as draw.io PNGs (v1.2.0)
+
+| Change | Why |
+|---|---|
+| **`azd up`** — `azure.yaml`, `infra/azd.bicep` (subscription scope: resource group + the shared `main.bicep`), `infra/azd.parameters.json`, and `infra/hooks/` (preprovision: environment-name, tenant/subscription and soft-delete guards; postprovision: writes `demo-ids.local.json`, stores the Search key, optionally ingests `DEMO_CORPUS_DIR`) | A demo should stand up with one command. azd, `deploy.ps1` and the manual path still produce identical resources and names |
+| **All four model deployments in Bicep** — `vision` (`gpt-4.1`) and `sol` (`gpt-5.6-sol`) join `embedding` and `chat`, serialized on the account; `deployHybridModels` / `DEPLOY_HYBRID_MODELS=false` opts out | They were two manual CLI commands after every deploy — the most-skipped step |
+| **`infra/hooks/common.ps1`** — `deploy.ps1` and the azd hooks now share the soft-delete guard, `Write-DemoIds` (also records `visionDeployment` / `frontierDeployment` / `frontierModel`, and no longer copies the template's `_template` flag) and the Key Vault secret step | One implementation, so the two paths can't drift |
+| **New [docs/12-configuration-reference.md](./docs/12-configuration-reference.md)** — every azd variable, hook knob, Bicep output, `deploy.ps1` parameter, `demo-ids.local.json` key and runtime environment variable, with default, consumer and recipes | Configuration was spread across Bicep, scripts and code defaults |
+| **`tests/test_configuration.py`** (10 tests) | Fails when a Bicep parameter isn't settable through azd, a parameter value isn't a quoted substitution, a hook reads an output nothing produces, or any azd variable / output / script setting is missing from docs/12 |
+| **Remaining text diagrams replaced with draw.io + PNG** — deployed topology (docs/00), repository package layout (docs/10, text tree kept in a collapsed block), plus new `azd up` flow (docs/03) and configuration flow (docs/12) diagrams; eight diagrams total | Visuals are what a wider audience reads first |
+| `.gitignore` excludes `.azure/` | azd environments hold subscription/tenant IDs and resolved endpoints |
+
+**Verified against current documentation (2026-09-30):** `azure.yaml` `infra.provider/path/module`
+(azd deploys `<path>/<module>.bicep` with `<module>.parameters.json`); infrastructure-only
+templates (no `services:`) are valid and `azd up` simply provisions; subscription-scoped main
+template is the standard pattern, while resource-group-scoped templates are **beta** — hence
+`azd.bicep` at subscription scope; parameter files are parsed as JSON before substitution, so
+bool/int values stay quoted (`"${VAR=default}"`); azd provides `AZURE_PRINCIPAL_ID` and
+`AZURE_PRINCIPAL_TYPE` (`User` / `ServicePrincipal`); Bicep output names are written to
+`.azure/<env>/.env` as-is and every hook receives them as environment variables; hook keys
+`shell`, `run`, `continueOnError`, `interactive`; `azd down --purge` purges soft-deleted Key
+Vault and Cognitive Services accounts; `azd provision --preview` is the what-if.
+
+Not yet run end to end against a subscription — `azure.yaml` parses (`azd show`), both
+templates compile, the hooks parse and their guards were exercised locally, and the shared
+`Write-DemoIds` helper was tested against object and hashtable inputs.
+
 ### Repository export, scripted walkthrough, oversized-upload guard, visuals (v1.1.0)
 
 Driven by a gap between what the pattern delivered and what the originating ask actually was:

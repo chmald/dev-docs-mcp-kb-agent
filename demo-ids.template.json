@@ -9,6 +9,7 @@
     "scripts/mcp_fallback_server.py (reads searchEndpoint, searchIndexName, knowledgeBaseName, keyVaultUri)",
     "scripts/deploy_mcp_server.ps1 (reads containerRegistry, containerAppsEnvironment, containerAppName, resourceGroup, corpus.mcpToolName, corpus.mcpToolDescription)",
     "scripts/export_repo_corpus.py (reads documentIntelligenceEndpoint, foundryOpenAIEndpoint, exportFigureDeployment|visionDeployment, chatApiVersion, corpus.displayName, corpus.exportExtractors)",
+    "infra/hooks/postprovision.ps1 + infra/deploy.ps1 (WRITE the deployment fields via infra/hooks/common.ps1 Write-DemoIds)",
     "scripts/demo_walkthrough.py (reads searchEndpoint, searchIndexName, keyVault|resourceGroup+searchService, walkthroughKnowledgeBase, walkthroughKnowledgeSource)"
   ],
 

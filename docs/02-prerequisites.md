@@ -14,6 +14,7 @@ This pattern runs on **Windows, Linux, and macOS**. Nothing in it is Windows-spe
 
 | Component | Cross-platform? | Notes |
 |---|---|---|
+| `azd up` (`azure.yaml` + `infra/hooks/*.ps1`) | ✅ | Hooks run under `pwsh` on every platform. |
 | `infra/deploy.ps1` | ✅ | PowerShell 7 (`pwsh`) runs on all three platforms. Invoke it as `pwsh ./infra/deploy.ps1` everywhere — including Linux and macOS. |
 | `scripts/*.py` | ✅ | Standard library + `azure-*` / `requests` / `pypdf`. No platform-specific paths. |
 | `az` CLI | ✅ | Identical syntax on all platforms. |
@@ -23,7 +24,9 @@ This pattern runs on **Windows, Linux, and macOS**. Nothing in it is Windows-spe
 | Tool | Minimum | Install |
 |---|---|---|
 | Azure CLI (`az`) | 2.60 | <https://aka.ms/installazurecli> |
-| PowerShell (`pwsh`) | 7.0 | <https://aka.ms/powershell> — needed on Linux/macOS too, for `deploy.ps1` |
+| Azure Developer CLI (`azd`) | 1.10 (validated with 1.34) | <https://aka.ms/azd-install> — for the one-command `azd up` path |
+| PowerShell (`pwsh`) | 7.0 | <https://aka.ms/powershell> — needed on Linux/macOS too, for `deploy.ps1` and the azd hooks |
+| draw.io desktop | current | Only to re-export diagram PNGs after editing a `.drawio` (`scripts/export_diagrams.py`) |
 | Python | 3.11 | <https://python.org> |
 | VS Code + **GitHub Copilot Chat** (`github.copilot-chat`) | current | For the consumption step in [07](./07-github-copilot-mcp-client-setup.md) |
 

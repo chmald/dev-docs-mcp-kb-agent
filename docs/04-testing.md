@@ -16,7 +16,7 @@ earning their place**. Run these after [03-deployment.md](./03-deployment.md).
 
 | # | Category | Answers | Automated |
 |---|---|---|---|
-| A | Functional | Did every resource deploy and connect? | partly |
+| A | Functional | Did every resource deploy and connect? | partly (`azd provision --preview` for a dry run) |
 | B | **Chunk quality** | Is what landed in the index actually usable? | ✅ `compare_extraction_tiers.py --audit` |
 | C | Quality (golden set) | Does retrieval return the right source? | ✅ `compare_extraction_tiers.py --golden` |
 | D | **Tier provenance** | Are both tiers contributing? | ✅ facet query |
@@ -153,8 +153,9 @@ SDK, and without it pytest reports a **collection error** for that file, not a t
 
 ```bash
 pip install -r scripts/requirements.txt
-python -m pytest tests -q          # 80 tests, all offline
+python -m pytest tests -q          # 90 tests, all offline
 az bicep build --file infra/main.bicep --stdout > $null
+az bicep build --file infra/azd.bicep --stdout > $null    # azd entry point
 python scripts/export_diagrams.py docs/assets --check   # every diagram PNG is newer than its .drawio
 ```
 
@@ -165,6 +166,7 @@ python scripts/export_diagrams.py docs/assets --check   # every diagram PNG is n
 | `test_mcp_fallback_server.py` | Optional MCP wrapper |
 | `test_export_repo_corpus.py` | Section splitting, page mapping across split parts, figure rewriting, register/pin/electrical extraction, manifest |
 | `test_demo_walkthrough.py` | Walkthrough pass/fail rules, both response shapes, and the oversized-upload guard |
+| `test_configuration.py` | azd ↔ Bicep parameter wiring, quoted parameter substitutions, hook ↔ output contract, and that **every** azd variable, output and script setting is documented in docs/12 |
 
 Run after any change to `scripts/`, `infra/`, or the index schema. The suite includes one
 regression test per defect class found during live builds — API-contract guards, harness

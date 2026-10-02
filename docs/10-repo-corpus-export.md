@@ -79,6 +79,13 @@ The free F0 tier analyzes **only the first two pages**, which produces a mislead
 
 ## What you get
 
+[![Repository package layout](./assets/repo-package-layout.png)](./assets/repo-package-layout.png)
+
+<sub>Editable source: [`assets/repo-package-layout.drawio`](./assets/repo-package-layout.drawio).</sub>
+
+<details>
+<summary>Folder tree as text</summary>
+
 ```
 repo-export/
 ├── README.md                          corpus index + how it was produced (Mermaid)
@@ -97,6 +104,8 @@ repo-export/
         ├── pins.json / .md
         └── electrical.json / .md      min/typ/max also parsed to numbers
 ```
+
+</details>
 
 Each section file starts like this, so a coding assistant can cite exactly where a value came from:
 

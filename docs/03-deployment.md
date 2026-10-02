@@ -4,7 +4,61 @@ Step-by-step build of the Developer Docs MCP Knowledge Base pattern via Bicep/Ia
 
 > **Don't want to use Bicep?** See [03b-manual-deployment.md](./03b-manual-deployment.md) for a complete Azure Portal + imperative CLI alternative that produces the same resources — useful when a customer's environment doesn't allow IaC deployments.
 
+> **Fastest path: `azd up`.** One command provisions everything in Phases 1–2 (resource group,
+> all four model deployments, `demo-ids.local.json`, the Key Vault secret) and can ingest a corpus
+> too. See [Fast path — azd up](#fast-path--azd-up) below. The phases after it are the
+> `deploy.ps1` path and the reference for what azd does.
+
 > **Build order matters.** Phases are sequential — each depends on artifacts from the prior phase. For the full "clone and stand up from scratch" experience with time budgets, see [docs/00-reproduce-this-demo.md](./00-reproduce-this-demo.md).
+
+---
+
+## Fast path — azd up
+
+[![azd up flow](./assets/azd-up-flow.png)](./assets/azd-up-flow.png)
+
+<sub>Editable source: [`assets/azd-up-flow.drawio`](./assets/azd-up-flow.drawio).</sub>
+
+```bash
+# 1. Sign both CLIs in to the DEMO tenant -- azd provisions with its own login,
+#    the hooks and scripts use az. Never rely on whichever account is ambient.
+azd auth login --tenant-id <entra-tenant-guid>
+az login --tenant <entra-tenant-guid>
+az account set --subscription <azure-subscription-guid>
+
+# 2. Create an environment (1-12 lowercase letters/digits -- it is part of every resource name)
+azd env new dev
+azd env set AZURE_TENANT_ID <entra-tenant-guid>
+azd env set AZURE_SUBSCRIPTION_ID <azure-subscription-guid>
+azd env set AZURE_LOCATION eastus2
+
+# 3. Optional: ingest a corpus in the same run (activate .venv first, docs/02 § 0)
+azd env set DEMO_CORPUS_DIR ./samples/corpus
+azd env set DEMO_PYTHON .venv/Scripts/python      # .venv/bin/python on Linux/macOS
+
+# 4. Preview, then deploy
+azd provision --preview
+azd up
+```
+
+| Step | What azd runs | Same as |
+|---|---|---|
+| preprovision hook | Environment-name guard; `az` must match the azd subscription/tenant; soft-deleted Foundry account purged (`DEMO_PURGE_SOFT_DELETED=true`) or reported | Phase 0 + `deploy.ps1`'s soft-delete check |
+| provision | `infra/azd.bicep`: resource group + **the same `main.bicep`** (Storage, Foundry + project, `embedding` · `chat` · `vision` · `sol`, AI Search, Key Vault, RBAC, optional Container App) | Phase 1 and the model step of Phase 2 |
+| postprovision hook | Writes `demo-ids.local.json` from the outputs, stores the Search admin key in Key Vault, ingests `DEMO_CORPUS_DIR` if set | `deploy.ps1`'s tail + Phase 2 §§ 2.2–2.4 |
+
+Every setting — region, resource group, models, capacities, SKU, hook behaviour — is an azd
+environment variable listed in [12-configuration-reference.md](./12-configuration-reference.md).
+Re-run only the hooks with `azd hooks run postprovision`; tear everything down with
+`azd down --purge` (also purges the soft-deleted Foundry account and Key Vault, so a redeploy
+with the same names works).
+
+### Fast-path validation
+
+- [ ] `azd up` ends with `[postprovision] Done`
+- [ ] `azd env get-values` shows `SEARCH_ENDPOINT`, `VISION_DEPLOYMENT=vision`, `FRONTIER_DEPLOYMENT=sol`
+- [ ] `demo-ids.local.json` exists at the repo root
+- [ ] Continue at [Phase 3](#phase-3--knowledge-base--mcp-endpoint) (or Phase 2 § 2.2 if you didn't set `DEMO_CORPUS_DIR`)
 
 ---
 
@@ -14,7 +68,7 @@ Step-by-step build of the Developer Docs MCP Knowledge Base pattern via Bicep/Ia
 |---|---|---|---|
 | 0 | Authenticate to the intended tenant + subscription | 2 min | `az account show` matches target |
 | 1 | Foundation resources (RG, Storage, Key Vault, Foundry + project, Search) via Bicep | 20-40 min | All resources `Succeeded`; RBAC assigned |
-| 2 | Frontier model deployments, route the corpus by page count, build **both** ingestion tiers | 20 min setup + ingestion | Both indexers `success`; index has rows from every tier routed to |
+| 2 | Route the corpus by page count, build **both** ingestion tiers (all four model deployments now come from Phase 1's Bicep) | 20 min setup + ingestion | Both indexers `success`; index has rows from every tier routed to |
 | 3 | Knowledge Base + verify the native MCP endpoint | 10 min | Retrieve call returns grounded, cited passages |
 | 4 | Optional custom wrapper MCP server | 45 min | Container App responds to an MCP `tools/list` call |
 | 5 | Wire GitHub Copilot / VS Code | 15 min | Copilot Chat (agent mode) answers a corpus question with a citation |
@@ -70,7 +124,7 @@ cd infra
 `deploy.ps1` runs `az deployment group create` against `main.bicep`, which provisions (see `infra/modules/`):
 
 - `storage.bicep` — Storage account + `raw` blob container
-- `foundry.bicep` — Cognitive Services multi-service account (kind `AIServices`) + `text-embedding-3-large` + chat model deployments
+- `foundry.bicep` — Cognitive Services multi-service account (kind `AIServices`) + Foundry project + four model deployments, created one after another: `embedding` (`text-embedding-3-large`), `chat` (`gpt-5-mini`), `vision` (`gpt-4.1`) and `sol` (`gpt-5.6-sol`). Models, versions and capacities are parameters ([12 § 1.3](./12-configuration-reference.md#13-models))
 - `search.bicep` — AI Search service (Standard tier, semantic ranker enabled)
 - `keyvault.bicep` — Key Vault for the Search admin key + any secrets the fallback server needs
 - `rbac.bicep` — role assignments (deployer + Search system-assigned MI → Storage Blob Data Reader; deployer → Key Vault Secrets Officer)
@@ -101,11 +155,13 @@ tiers in **one** index. See [01-architecture.md](./01-architecture.md#ingestion-
 design and [08-extraction-tier-comparison.md](./08-extraction-tier-comparison.md) for the
 measured justification and cost.
 
-### 2.1 Deploy the frontier models
+### 2.1 Frontier model deployments (now created by the Bicep)
 
-The Bicep creates `embedding` and `chat`. The hybrid additionally needs two frontier
-deployments — names must match `demo-ids.local.json` (`frontierDeployment`,
-`cuModelDeployment`):
+Phase 1 (and `azd up`) creates `vision` and `sol` alongside `embedding` and `chat`, so there is
+nothing to do here by default. Create them by hand only if you deployed with
+`deployHybridModels=false` / `DEPLOY_HYBRID_MODELS=false` (for example because the models
+already exist). Names must match `demo-ids.local.json` (`visionDeployment`,
+`frontierDeployment`):
 
 ```bash
 # Figure verbalization, BOTH tiers. Deliberately a NON-reasoning model: the

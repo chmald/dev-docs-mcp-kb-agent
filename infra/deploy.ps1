@@ -35,7 +35,7 @@ $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptDir
 $idsLocalPath = Join-Path $repoRoot "demo-ids.local.json"
-$idsTemplatePath = Join-Path $repoRoot "demo-ids.template.json"
+. (Join-Path $scriptDir "hooks/common.ps1")
 
 Write-Host "== Developer Docs MCP Knowledge Agent -- infra deploy ==" -ForegroundColor Cyan
 
@@ -55,25 +55,10 @@ if ($rgExists -eq "false") {
     az group create --name $ResourceGroup --location $Region | Out-Null
 }
 
-# --- Soft-delete guard -------------------------------------------------------
-# Deleting the resource group SOFT-deletes Cognitive Services accounts. Redeploying
-# with the same name then fails preflight with FlagMustBeSetForRestore, which reads
-# like a template bug rather than leftover state. Detect it and offer to purge.
-$foundryName = "aif-ddmcp-$Environment-$Region"
-$deleted = az cognitiveservices account list-deleted --query "[?name=='$foundryName'] | [0].name" -o tsv 2>$null
-if ($deleted) {
-    Write-Host "`nA soft-deleted Cognitive Services account named '$foundryName' still exists." -ForegroundColor Yellow
-    Write-Host "Redeploying with the same name will fail preflight until it is purged or restored." -ForegroundColor Yellow
-    $purge = Read-Host "Purge it now and continue? (y/N)"
-    if ($purge -eq "y") {
-        Write-Host "Purging $foundryName..."
-        az cognitiveservices account purge --location $Region --resource-group $ResourceGroup --name $foundryName | Out-Null
-        Write-Host "Purged. Note the purge can take a minute to propagate; re-run this script if the deploy still reports FlagMustBeSetForRestore." -ForegroundColor Green
-    } else {
-        Write-Host "Aborting. Purge manually with:" -ForegroundColor Red
-        Write-Host "  az cognitiveservices account purge --location $Region --resource-group $ResourceGroup --name $foundryName" -ForegroundColor Red
-        exit 1
-    }
+# --- Soft-delete guard (shared with the azd preprovision hook) --------------
+$foundryName = Get-FoundryAccountName -Environment $Environment -Region $Region
+if (-not (Resolve-SoftDeletedFoundry -Name $foundryName -Region $Region -ResourceGroup $ResourceGroup -Mode Prompt)) {
+    exit 1
 }
 
 # --- Resolve the deployer's principal ID for Key Vault + Storage RBAC ---
@@ -144,73 +129,22 @@ if (-not $summary -or -not $summary.searchService -or -not $summary.keyVault) {
     exit 1
 }
 
-# --- Merge into demo-ids.local.json (preserve any manually-populated fields) ---
-$ids = if (Test-Path $idsLocalPath) {
-    Get-Content $idsLocalPath -Raw | ConvertFrom-Json -AsHashtable
-} else {
-    Get-Content $idsTemplatePath -Raw | ConvertFrom-Json -AsHashtable
-}
-
-$ids["resourceGroup"]                = $summary.resourceGroup
-$ids["region"]                       = $summary.region
-$ids["environment"]                  = $summary.environment
-$ids["storageAccount"]               = $summary.storageAccount
-$ids["blobEndpoint"]                 = $summary.blobEndpoint
-$ids["rawContainer"]                 = $summary.rawContainer
-$ids["foundryResource"]              = $summary.foundryResource
-$ids["foundryOpenAIEndpoint"]        = $summary.foundryOpenAIEndpoint
-$ids["documentIntelligenceEndpoint"] = $summary.documentIntelligenceEndpoint
-$ids["aiServicesSubdomainUrl"]       = $summary.aiServicesSubdomainUrl
-$ids["foundryProject"]               = $summary.foundryProject
-$ids["embeddingDeployment"]          = $summary.embeddingDeployment
-$ids["chatDeployment"]               = $summary.chatDeployment
-$ids["searchService"]                = $summary.searchService
-$ids["searchEndpoint"]               = $summary.searchEndpoint
-$ids["searchPrincipalId"]            = $summary.searchPrincipalId
-$ids["keyVault"]                     = $summary.keyVault
-$ids["keyVaultUri"]                  = $summary.keyVaultUri
-$ids["tenantId"]                     = $account.tenant
-$ids["subscriptionId"]               = $account.subscription
-
-if ($summary.fallbackServerDeployed) {
-    if (-not $ids.ContainsKey("_fallback_mcp_server_fields_populated_only_if_deployed")) {
-        $ids["_fallback_mcp_server_fields_populated_only_if_deployed"] = @{}
-    }
-    $ids["_fallback_mcp_server_fields_populated_only_if_deployed"]["containerRegistry"] = $summary.containerRegistry
-    $ids["_fallback_mcp_server_fields_populated_only_if_deployed"]["containerAppFqdn"]  = $summary.containerAppFqdn
-}
-
-$ids | ConvertTo-Json -Depth 10 | Set-Content -Path $idsLocalPath -Encoding utf8
-Write-Host "Wrote resource IDs to $idsLocalPath" -ForegroundColor Green
-
-# --- Store the Search admin key in Key Vault ---
-$adminKey = az search admin-key show --resource-group $ResourceGroup --service-name $summary.searchService --query primaryKey -o tsv
-if ($LASTEXITCODE -ne 0 -or -not $adminKey) {
-    Write-Host "Could not read the Search admin key for '$($summary.searchService)'. Resource IDs were written, but the Key Vault secret was NOT set." -ForegroundColor Red
+# --- Write demo-ids.local.json + store the Search admin key (shared with the azd postprovision hook) ---
+Write-DemoIds -Summary $summary -TenantId $account.tenant -SubscriptionId $account.subscription -RepoRoot $repoRoot | Out-Null
+$keyStatus = Set-SearchAdminKeySecret -ResourceGroup $ResourceGroup -SearchService $summary.searchService -KeyVault $summary.keyVault
+if ($keyStatus -eq 'no-key') {
+    Write-Host "Resource IDs were written, but the Search admin key could not be read." -ForegroundColor Red
     exit 1
-}
-az keyvault secret set --vault-name $summary.keyVault --name "search-admin-key" --value $adminKey | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "WARNING: could not write 'search-admin-key' to Key Vault '$($summary.keyVault)'." -ForegroundColor Yellow
-    Write-Host "  This is expected in subscriptions where policy forces Key Vault publicNetworkAccess=Disabled." -ForegroundColor Yellow
-    Write-Host "  The setup scripts fall back to 'az search admin-key show', so the build can continue." -ForegroundColor Yellow
-} else {
-    Write-Host "Stored Search admin key in Key Vault '$($summary.keyVault)' as secret 'search-admin-key'" -ForegroundColor Green
 }
 
 Write-Host "`nDeployment complete. Next:" -ForegroundColor Cyan
-Write-Host "  1. Deploy the two model deployments the hybrid ingestion path needs:" -ForegroundColor Cyan
-Write-Host "     # Figure verbalization (both tiers) -- NON-reasoning model on purpose:" -ForegroundColor Cyan
-Write-Host "     # the vision skill has a fixed 30s timeout whose failure mode is total." -ForegroundColor Cyan
-Write-Host "     az cognitiveservices account deployment create -n $($summary.foundryResource) -g $ResourceGroup ``" -ForegroundColor Cyan
-Write-Host "       --deployment-name vision --model-name gpt-4.1 --model-version 2025-04-14 ``" -ForegroundColor Cyan
-Write-Host "       --model-format OpenAI --sku-name GlobalStandard --sku-capacity 400" -ForegroundColor Cyan
-Write-Host "     # Knowledge-base query planning -- frontier, no timeout pressure:" -ForegroundColor Cyan
-Write-Host "     az cognitiveservices account deployment create -n $($summary.foundryResource) -g $ResourceGroup ``" -ForegroundColor Cyan
-Write-Host "       --deployment-name sol --model-name gpt-5.6-sol --model-version 2026-07-09 ``" -ForegroundColor Cyan
-Write-Host "       --model-format OpenAI --sku-name GlobalStandard --sku-capacity 200" -ForegroundColor Cyan
+if (-not $summary.hybridModelsDeployed) {
+    Write-Host "  1. deployHybridModels=false: create the 'vision' and 'sol' deployments by hand (docs/00 § A3)." -ForegroundColor Cyan
+} else {
+    Write-Host "  1. Model deployments 'embedding', 'chat', 'vision' and 'sol' were created by the Bicep." -ForegroundColor Cyan
+}
 Write-Host "  2. cd ../scripts && pip install -r requirements.txt" -ForegroundColor Cyan
-Write-Host "  3. python hybrid_ingest.py --ids-file $idsLocalPath --plan   --source-dir <your-pdfs>" -ForegroundColor Cyan
-Write-Host "  4. python hybrid_ingest.py --ids-file $idsLocalPath --upload --source-dir <your-pdfs>" -ForegroundColor Cyan
+Write-Host "  3. python hybrid_ingest.py --ids-file $idsLocalPath --split --plan   --source-dir <your-pdfs>" -ForegroundColor Cyan
+Write-Host "  4. python hybrid_ingest.py --ids-file $idsLocalPath --split --upload --source-dir <your-pdfs>" -ForegroundColor Cyan
 Write-Host "  5. python hybrid_ingest.py --ids-file $idsLocalPath --build" -ForegroundColor Cyan
 Write-Host "`n  See docs/00-reproduce-this-demo.md for the full checkpointed walkthrough." -ForegroundColor Cyan

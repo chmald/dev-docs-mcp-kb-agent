@@ -4,6 +4,8 @@ A complete alternative to [03-deployment.md](./03-deployment.md) for customers w
 
 > **When to use this instead of `03-deployment.md`:** the customer's environment doesn't allow Bicep/ARM template deployments, the operator doesn't have Bicep CLI tooling available, or you want to demonstrate each resource being created individually (useful for a workshop/teaching context). Otherwise, `03-deployment.md`'s Bicep path is faster and less error-prone — use this doc as the exception, not the default.
 
+> **If IaC *is* allowed,** `azd up` is the fastest path: one command, same resources and names. See [03 § Fast path — azd up](./03-deployment.md#fast-path--azd-up).
+
 ---
 
 ## Phase overview (manual path)

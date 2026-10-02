@@ -54,7 +54,7 @@ These decisions are **the v1 baseline**. Deviate only with an explicit decision 
 | 6 | MCP exposure — optional wrapper | Thin **custom MCP server** (Python `mcp` SDK), deployable to Azure Container Apps or run locally over stdio | Defense-in-depth: bearer-token lifecycle management, custom pre/post-processing, or IP allowlisting beyond what the native endpoint offers on its own — not required to get a working demo |
 | 7 | Consumption | GitHub Copilot in VS Code via workspace `.vscode/mcp.json` (agent mode) | Matches the target scenario directly — developers stay in their editor, no separate chat surface |
 | 8 | Auth (v1) | API key (Search admin/query key) | Fastest path to a working demo; Microsoft's recommended production path is an Entra ID bearer token (`https://search.azure.com/.default` scope) + **Search Index Data Reader** RBAC — documented in [01-architecture.md](./docs/01-architecture.md#trust-boundaries-and-security) |
-| 9 | Deployment | Bicep (Storage, a Foundry multi-service Cognitive Services account for Document Intelligence + embeddings, AI Search, optional Container App) + two Python setup scripts — **or** a fully manual Azure Portal + imperative CLI path with no IaC/code required (see [docs/03b-manual-deployment.md](./docs/03b-manual-deployment.md)) | Matches the single-command build convention used by sibling patterns in this Demos folder, while still supporting customers who can't or won't run Bicep |
+| 9 | Deployment | **`azd up`** (Azure Developer CLI: `infra/azd.bicep` → the shared `main.bicep`, with pre/postprovision hooks) as the one-command default; `infra/deploy.ps1` for an existing resource group; a fully manual Azure Portal + imperative CLI path ([docs/03b-manual-deployment.md](./docs/03b-manual-deployment.md)). All three deploy the same `main.bicep` resources — Storage, a Foundry multi-service account with four model deployments, AI Search, Key Vault, optional Container App | One command for a demo, without losing the script and no-IaC paths customers need. Every setting is an azd environment variable ([docs/12](./docs/12-configuration-reference.md)) |
 
 See [01-architecture.md](./docs/01-architecture.md) for the full design narrative and trust boundaries.
 
@@ -70,7 +70,7 @@ All narrative documentation lives under `docs/`, in build order. The repo root h
 | docs/00-reproduce-this-demo.md | Single-page "stand up from scratch" orchestrator — start here for a guided, checkpointed build |
 | docs/01-architecture.md | Reference architecture: diagram, components, data flow, trust boundaries, decisions |
 | docs/02-prerequisites.md | Subscriptions, licensing, RBAC, model/region availability, quotas, naming conventions |
-| docs/03-deployment.md | Step-by-step build (Bicep) with validation gates |
+| docs/03-deployment.md | **`azd up` fast path** + step-by-step build (Bicep / `deploy.ps1`) with validation gates |
 | docs/03b-manual-deployment.md | Step-by-step build via Azure Portal + imperative CLI — no Bicep/IaC required |
 | docs/04-testing.md | Functional, **chunk-quality**, retrieval, **tier-provenance** and regression tests |
 | docs/05-troubleshooting.md | Symptom-by-symptom diagnosis |
@@ -79,9 +79,11 @@ All narrative documentation lives under `docs/`, in build order. The repo root h
 | **docs/08-extraction-tier-comparison.md** | **The "why both services" doc** — DI-only vs CU-only vs hybrid, measured; the 300-page limit; figure verbalization; model selection; and the **cost model**. Read this before quoting a customer. |
 | **docs/09-findings-and-lessons.md** | **Every defect, constraint and gotcha** from two clean-room rebuilds, organised by symptom — including the errors whose messages point at the wrong cause, and corrections to guidance that proved wrong |
 | **docs/10-repo-corpus-export.md** | **PDF → repository package**: page-cited Markdown sections, original figure images, Mermaid, and opt-in register/pin/electrical extraction. Index vs. export vs. both, compared |
+| **docs/12-configuration-reference.md** | **Every configurable value** — azd environment variables, hook knobs, `deploy.ps1` parameters, `demo-ids.local.json` keys, runtime environment variables — with defaults and consumers |
 | **docs/11-customer-walkthrough.md** | **Scripted customer demo** with expected citations and pass/fail — rehearse with it, present with `--present` |
 | docs/assets/*.drawio + *.png | Diagram sources and their exported PNGs: reference architecture, hybrid routing, repository export, customer walkthrough. Embed the PNG; edit the `.drawio` |
-| infra/ | Bicep IaC (main template + modules) |
+| azure.yaml | Azure Developer CLI template — `azd up` |
+| infra/ | Bicep IaC: `main.bicep` (shared by every path), `azd.bicep` + `azd.parameters.json` (azd entry point), `modules/`, `deploy.ps1`, and `hooks/` (azd pre/postprovision + helpers shared with `deploy.ps1`) |
 | scripts/hybrid_ingest.py | **The production path** — page-count router, both ingestion tiers, unified index, knowledge base |
 | scripts/compare_extraction_tiers.py | Re-runnable A/B harness — audits chunk quality and retrieval per tier, emits a scorecard to `out/` |
 | scripts/export_repo_corpus.py | PDF → repository-committable corpus (analyze once, export offline) |
@@ -97,6 +99,7 @@ All narrative documentation lives under `docs/`, in build order. The repo root h
 
 | If you want to… | Read |
 |---|---|
+| **Build it fast** | README § Quick start (`azd up`), then `docs/07` (Copilot) and `docs/11` (rehearse) |
 | **Build it** | `docs/00` → `docs/07` in order. `docs/03b` is a complete Bicep-free alternative to `docs/03`; everything else applies to both paths unchanged. |
 | **Understand why it uses two services** | `docs/01` for the design, then **`docs/08`** for the measured justification and cost model |
 | **Sell it** | **`docs/08`** — DI-only vs CU-only vs hybrid, on real numbers — then rehearse with **`docs/11`** |
@@ -113,10 +116,30 @@ in these docs is written to paste cleanly into PowerShell, bash, or zsh.
 
 ---
 
+## Quick start — one command
+
+```bash
+azd auth login --tenant-id <tenant-id>            # azd's login
+az login --tenant <tenant-id>                     # the hooks and scripts use az
+azd env new dev
+azd env set AZURE_SUBSCRIPTION_ID <subscription-id>
+azd env set AZURE_LOCATION eastus2
+azd up
+```
+
+`azd up` provisions every resource (including all four model deployments), writes
+`demo-ids.local.json`, stores the Search key, and, if `DEMO_CORPUS_DIR` is set, ingests your
+PDFs. Every setting is listed in [docs/12-configuration-reference.md](./docs/12-configuration-reference.md);
+the step-by-step and the `deploy.ps1` / Portal alternatives are in [docs/03](./docs/03-deployment.md)
+and [docs/03b](./docs/03b-manual-deployment.md).
+
+---
+
 ## Quick-start prerequisites at a glance
 
 Full detail in [02-prerequisites.md](./docs/02-prerequisites.md):
 
+- Azure Developer CLI (`azd`) for the one-command path, plus Azure CLI and PowerShell 7
 - Azure subscription with quota for AI Search (Basic tier minimum for semantic ranker + knowledge bases; Standard S1+ for production), a Cognitive Services multi-service account, and Storage
 - Azure OpenAI model access for `text-embedding-3-large` and a chat-completion model (e.g. `gpt-5-mini`) in a region that supports both
 - Contributor + RBAC-admin rights on the target resource group

@@ -13,25 +13,9 @@
 
 ## What you end up with
 
-```
-Developer's laptop                    Azure subscription (rg-ddmcp-<env>-<region>)
-┌────────────────────────┐            ┌─────────────────────────────────────────────┐
-│ VS Code                │            │  Blob Storage                                │
-│  + GitHub Copilot      │            │    raw/cu/  (<= 300 pages)                   │
-│  + .vscode/mcp.json    │            │    raw/di/  (>  300 pages)                   │
-│    (agent mode)        │            │        │                                     │
-│                        │            │   ┌────┴─────┐                               │
-│                        │            │   │ Tier CU  │ Content Understanding         │
-│                        │            │   │ Tier DI+ │ Doc Layout + vision skill     │
-│                        │            │   └────┬─────┘                               │
-│                        │            │        ▼                                     │
-│                        │◄──MCP──────┼── ONE index → ONE Knowledge Base → MCP        │
-│                        │ (Streamable│                                              │
-│                        │   HTTP)    │  Foundry: Doc Intelligence + embeddings +    │
-│                        │            │  frontier chat/vision models                 │
-│                        │            │  Key Vault: Search admin key                 │
-└────────────────────────┘            └─────────────────────────────────────────────┘
-```
+[![Deployed topology](./assets/deployed-topology.png)](./assets/deployed-topology.png)
+
+<sub>Editable source: [`assets/deployed-topology.drawio`](./assets/deployed-topology.drawio).</sub>
 
 Read [01-architecture.md](./01-architecture.md) for *why* ingestion is split into two tiers,
 and [08-extraction-tier-comparison.md](./08-extraction-tier-comparison.md) for the measured
@@ -81,6 +65,12 @@ pip install -r scripts/requirements.txt
 
 ## Part A — Provision the platform
 
+> **One command instead of A1–A3:** `azd up` provisions everything below, writes
+> `demo-ids.local.json` and can ingest your corpus in the same run. Steps and settings:
+> [03 § Fast path — azd up](./03-deployment.md#fast-path--azd-up) and
+> [12-configuration-reference.md](./12-configuration-reference.md). Then continue at Part B
+> (or Part C if you set `DEMO_CORPUS_DIR`).
+
 ### A1. Authenticate to the intended tenant/subscription
 
 Never trust the ambient `az` login — see
@@ -97,10 +87,11 @@ Provisions Storage, the Foundry multi-service account **plus a Foundry project**
 Key Vault, and RBAC, then writes `demo-ids.local.json`. Detail:
 [03-deployment.md § Phase 1](./03-deployment.md#phase-1--foundation-resources).
 
-### A3. Deploy the frontier models
+### A3. Frontier models (created by the Bicep — usually nothing to do)
 
-The Bicep creates the embedding + chat deployments. Add the two frontier deployments the
-hybrid uses (names must match `demo-ids.local.json`):
+The Bicep now creates all four deployments (`embedding`, `chat`, `vision`, `sol`). Run the two
+commands below only if you deployed with `deployHybridModels=false` / `DEPLOY_HYBRID_MODELS=false`
+(names must match `demo-ids.local.json`):
 
 ```bash
 # Figure verbalization, BOTH tiers. Deliberately a NON-reasoning model: the

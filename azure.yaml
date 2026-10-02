@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+#
+# Azure Developer CLI template -- `azd up` stands up the whole demo.
+# Infrastructure-only: there are no app services to deploy, so `azd up` runs
+# provision (infra/azd.bicep) plus the two hooks below. Every setting is an azd
+# environment variable -- see docs/12-configuration-reference.md.
+name: dev-docs-mcp-knowledge-agent
+metadata:
+  template: dev-docs-mcp-knowledge-agent@1.1.0
+
+infra:
+  provider: bicep
+  path: infra
+  module: azd
+
+hooks:
+  # Environment-name, tenant/subscription and soft-delete guards.
+  preprovision:
+    shell: pwsh
+    run: ./infra/hooks/preprovision.ps1
+    continueOnError: false
+    interactive: true
+  # Writes demo-ids.local.json, stores the Search key, optionally ingests DEMO_CORPUS_DIR.
+  postprovision:
+    shell: pwsh
+    run: ./infra/hooks/postprovision.ps1
+    continueOnError: false
+    interactive: true

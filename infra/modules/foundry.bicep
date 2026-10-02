@@ -25,6 +25,27 @@ param embeddingCapacity int = 30
 @description('Chat deployment capacity (in thousands of TPM). Agentic retrieval spends this on query planning AND answer generation per retrieve call -- 10K TPM returns HTTP 429 on the very first query. 150K is a comfortable POC floor.')
 param chatCapacity int = 150
 
+@description('Also deploy the two models the hybrid ingestion path needs (vision + frontier). Turn off only if they already exist or quota is unavailable -- then create them by hand (docs/00 A3).')
+param deployHybridModels bool = true
+
+@description('Vision model for figure verbalization on BOTH tiers. Deliberately NON-reasoning: the vision skill has a fixed 30s timeout whose failure mode is total, so latency variance matters more than capability (docs/08 § Model selection).')
+param visionModelName string = 'gpt-4.1'
+
+@description('Vision model version')
+param visionModelVersion string = '2025-04-14'
+
+@description('Vision deployment capacity (thousands of TPM; requests/minute scale with it). A RELIABILITY setting: AI Search fires figure calls concurrently with no client-side throttle, and under-provisioning surfaces as a misleading 30s timeout.')
+param visionCapacity int = 1000
+
+@description('Frontier model for knowledge-base query planning (no timeout pressure there).')
+param frontierModelName string = 'gpt-5.6-sol'
+
+@description('Frontier model version')
+param frontierModelVersion string = '2026-07-09'
+
+@description('Frontier deployment capacity (thousands of TPM)')
+param frontierCapacity int = 200
+
 resource foundryAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   name: foundryAccountName
   location: location
@@ -106,6 +127,45 @@ resource chatDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-1
   ]
 }
 
+// Same serialization rule: one deployment operation at a time on the account.
+resource visionDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = if (deployHybridModels) {
+  parent: foundryAccount
+  name: 'vision'
+  sku: {
+    name: 'GlobalStandard'
+    capacity: visionCapacity
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: visionModelName
+      version: visionModelVersion
+    }
+  }
+  dependsOn: [
+    chatDeployment
+  ]
+}
+
+resource frontierDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = if (deployHybridModels) {
+  parent: foundryAccount
+  name: 'sol'
+  sku: {
+    name: 'GlobalStandard'
+    capacity: frontierCapacity
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: frontierModelName
+      version: frontierModelVersion
+    }
+  }
+  dependsOn: [
+    visionDeployment
+  ]
+}
+
 output foundryAccountId string = foundryAccount.id
 output foundryAccountName string = foundryAccount.name
 output openAIEndpoint string = foundryAccount.properties.endpoint
@@ -116,3 +176,10 @@ output foundryProjectName string = foundryProject.name
 output principalId string = foundryAccount.identity.principalId
 output embeddingDeploymentName string = embeddingDeployment.name
 output chatDeploymentName string = chatDeployment.name
+// Deployment names are fixed ('vision', 'sol') and must match what the scripts
+// read from demo-ids.local.json (visionDeployment / frontierDeployment).
+output visionDeploymentName string = 'vision'
+output visionModelName string = visionModelName
+output frontierDeploymentName string = 'sol'
+output frontierModelName string = frontierModelName
+output hybridModelsDeployed bool = deployHybridModels

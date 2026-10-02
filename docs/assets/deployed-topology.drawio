@@ -1,0 +1,122 @@
+<mxfile host="Electron" version="26.0.0">
+  <diagram id="deployed-topology" name="Deployed Topology">
+    <mxGraphModel dx="1422" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="800" math="0" shadow="0" background="#FFFFFF">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="What you end up with — deployed topology" vertex="1" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;fontColor=#323130;">
+          <mxGeometry x="20" y="10" width="1660" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="One resource group, created by azd up (or deploy.ps1 / the manual path). Every name derives from the workload + environment + region tokens." vertex="1" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=14;fontStyle=2;fontColor=#605E5C;">
+          <mxGeometry x="20" y="50" width="1660" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="laptop" value="Developer workstation" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#FDF3F4;strokeColor=#A4262C;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontStyle=1;fontSize=14;fontColor=#A4262C;spacingTop=8;">
+          <mxGeometry x="20" y="100" width="330" height="640" as="geometry" />
+        </mxCell>
+        <mxCell id="vsc" value="💻 &lt;b&gt;VS Code + GitHub Copilot&lt;/b&gt;&lt;br&gt;agent mode&lt;br&gt;.vscode/mcp.json → kb-hybrid" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FDF3F4;strokeColor=#A4262C;strokeWidth=3;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="40" y="160" width="290" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="scripts" value="⚡ &lt;b&gt;scripts/&lt;/b&gt;&lt;br&gt;hybrid_ingest.py · export_repo_corpus.py&lt;br&gt;demo_walkthrough.py&lt;br&gt;&lt;i&gt;REST to AI Search · upload to Storage&lt;/i&gt;" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#A4262C;strokeWidth=2;fontSize=11;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="40" y="300" width="290" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="ids" value="🗂 &lt;b&gt;demo-ids.local.json&lt;/b&gt;&lt;br&gt;written by the postprovision hook&lt;br&gt;(or deploy.ps1) — gitignored" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#605E5C;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="40" y="440" width="290" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="azdenv" value="⚙ &lt;b&gt;.azure/&amp;lt;env&amp;gt;/.env&lt;/b&gt;&lt;br&gt;azd environment values&lt;br&gt;(azd env set …) — gitignored" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#605E5C;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;dashed=1;">
+          <mxGeometry x="40" y="580" width="290" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="rg" value="Azure subscription · resource group rg-ddmcp-&amp;lt;env&amp;gt;-&amp;lt;region&amp;gt;" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#F3F9FD;strokeColor=#0078D4;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontStyle=1;fontSize=14;fontColor=#0078D4;spacingTop=8;">
+          <mxGeometry x="390" y="100" width="1290" height="640" as="geometry" />
+        </mxCell>
+        <mxCell id="st" value="&lt;b&gt;Storage account&lt;/b&gt;&lt;br&gt;container raw/ · prefixes cu/ and di/" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#0078D4;strokeWidth=2;fontSize=12;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=60;spacingRight=6;image=img/lib/azure2/storage/Storage_Accounts.svg;imageWidth=40;imageHeight=40;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="420" y="160" width="300" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="kv" value="&lt;b&gt;Key Vault&lt;/b&gt;&lt;br&gt;secret: search-admin-key" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#0078D4;strokeWidth=2;fontSize=12;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=60;spacingRight=6;image=img/lib/azure2/security/Key_Vaults.svg;imageWidth=40;imageHeight=40;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="420" y="300" width="300" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="aci" value="&lt;b&gt;Container App&lt;/b&gt; (optional)&lt;br&gt;fallback MCP wrapper + registry&lt;br&gt;DEPLOY_FALLBACK_SERVER=true" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#0078D4;strokeWidth=2;fontSize=12;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=60;spacingRight=6;image=img/lib/azure2/containers/Container_Instances.svg;imageWidth=40;imageHeight=40;imageAlign=left;imageVerticalAlign=middle;dashed=1;">
+          <mxGeometry x="420" y="440" width="300" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="fdy" value="Microsoft Foundry account (kind: AIServices) + project" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#5C2D91;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontStyle=1;fontSize=14;fontColor=#5C2D91;spacingTop=8;">
+          <mxGeometry x="760" y="150" width="420" height="560" as="geometry" />
+        </mxCell>
+        <mxCell id="cuf" value="&lt;b&gt;Content Understanding&lt;/b&gt;&lt;br&gt;+ Document Intelligence (Layout)" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=2;fontSize=11;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=60;spacingRight=6;image=img/lib/azure2/ai_machine_learning/Cognitive_Services.svg;imageWidth=40;imageHeight=40;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="780" y="200" width="380" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="m0" value="&lt;b&gt;embedding&lt;/b&gt; — text-embedding-3-large · Standard&lt;br&gt;integrated vectorization" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=2;fontSize=11;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=54;spacingRight=6;image=img/lib/azure2/ai_machine_learning/Azure_OpenAI.svg;imageWidth=34;imageHeight=34;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="780" y="300" width="380" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="m1" value="&lt;b&gt;chat&lt;/b&gt; — gpt-5-mini · GlobalStandard&lt;br&gt;baseline pipeline / fallback" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=2;fontSize=11;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=54;spacingRight=6;image=img/lib/azure2/ai_machine_learning/Azure_OpenAI.svg;imageWidth=34;imageHeight=34;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="780" y="395" width="380" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="m2" value="&lt;b&gt;vision&lt;/b&gt; — gpt-4.1 · GlobalStandard&lt;br&gt;figure verbalization (both tiers)" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=2;fontSize=11;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=54;spacingRight=6;image=img/lib/azure2/ai_machine_learning/Azure_OpenAI.svg;imageWidth=34;imageHeight=34;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="780" y="490" width="380" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="m3" value="&lt;b&gt;sol&lt;/b&gt; — gpt-5.6-sol · GlobalStandard&lt;br&gt;knowledge-base query planning" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=2;fontSize=11;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=54;spacingRight=6;image=img/lib/azure2/ai_machine_learning/Azure_OpenAI.svg;imageWidth=34;imageHeight=34;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="780" y="585" width="380" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="srch" value="Azure AI Search (Basic+)" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#5C2D91;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontStyle=1;fontSize=14;fontColor=#5C2D91;spacingTop=8;">
+          <mxGeometry x="1220" y="150" width="430" height="560" as="geometry" />
+        </mxCell>
+        <mxCell id="idx" value="&lt;b&gt;idx-documents-hybrid&lt;/b&gt;&lt;br&gt;unified index · both tiers" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=2;fontSize=12;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=60;spacingRight=6;image=img/lib/azure2/app_services/Search_Services.svg;imageWidth=40;imageHeight=40;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="1240" y="200" width="390" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ixr" value="&lt;b&gt;Indexers + skillsets&lt;/b&gt;&lt;br&gt;ixr-hybrid-cu · ixr-hybrid-di&lt;br&gt;(managed identity to Storage + Foundry)" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="1240" y="320" width="390" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="kbt" value="🧠 &lt;b&gt;kb-hybrid&lt;/b&gt; knowledge base&lt;br&gt;+ ks-hybrid knowledge source" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=2;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="1240" y="450" width="390" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="mcpt" value="&lt;b&gt;Native MCP endpoint&lt;/b&gt;&lt;br&gt;/knowledgebases/kb-hybrid/mcp" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3F9FD;strokeColor=#0078D4;strokeWidth=3;fontSize=12;fontColor=#323130;align=center;verticalAlign=middle;arcSize=10;">
+          <mxGeometry x="1240" y="570" width="390" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="t1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#A4262C;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="mcpt" target="vsc">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1435" y="725" />
+              <mxPoint x="342" y="725" />
+              <mxPoint x="342" y="205" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="t1_lbl" value="Streamable HTTP" vertex="1" connectable="0" parent="t1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontColor=#A4262C;labelBackgroundColor=#ffffff;">
+          <mxGeometry x="0.0" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="t2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#0078D4;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="scripts" target="st">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="370" y="327" />
+              <mxPoint x="370" y="200" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="t2_lbl" value="upload" vertex="1" connectable="0" parent="t2" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontColor=#0078D4;labelBackgroundColor=#ffffff;">
+          <mxGeometry x="0.0" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="t6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#605E5C;dashed=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" edge="1" parent="1" source="kv" target="scripts">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="380" y="340" />
+              <mxPoint x="380" y="367" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="t6_lbl" value="admin key" vertex="1" connectable="0" parent="t6" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontColor=#605E5C;labelBackgroundColor=#ffffff;">
+          <mxGeometry x="0.0" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="t7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#605E5C;dashed=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="azdenv" target="ids">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#605E5C;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="ids" target="scripts">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

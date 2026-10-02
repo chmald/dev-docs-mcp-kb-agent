@@ -1,0 +1,64 @@
+<mxfile host="Electron" version="26.0.0">
+  <diagram id="repository-package-layout" name="Repository Package Layout">
+    <mxGraphModel dx="1422" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="700" math="0" shadow="0" background="#FFFFFF">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="What the repository export produces" vertex="1" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;fontColor=#323130;">
+          <mxGeometry x="20" y="10" width="1460" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="One folder per source document, plus a corpus index. Copy the document folder into the consuming repo." vertex="1" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=14;fontStyle=2;fontColor=#605E5C;">
+          <mxGeometry x="20" y="50" width="1460" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="root" value="repo-export/" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#EFF8F8;strokeColor=#036C70;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontStyle=1;fontSize=14;fontColor=#036C70;spacingTop=8;">
+          <mxGeometry x="20" y="100" width="1460" height="570" as="geometry" />
+        </mxCell>
+        <mxCell id="r1" value="&lt;b&gt;README.md&lt;/b&gt;&lt;br&gt;corpus index · how it was produced" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#036C70;strokeWidth=2;fontSize=11;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=60;spacingRight=6;image=img/lib/azure2/general/File.svg;imageWidth=40;imageHeight=40;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="50" y="160" width="330" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="r2" value="&lt;b&gt;COPILOT-INSTRUCTIONS.snippet.md&lt;/b&gt;&lt;br&gt;paste into .github/copilot-instructions.md" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#036C70;strokeWidth=2;fontSize=11;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=60;spacingRight=6;image=img/lib/azure2/general/File.svg;imageWidth=40;imageHeight=40;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="50" y="250" width="330" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="r3" value="&lt;b&gt;manifest.json&lt;/b&gt;&lt;br&gt;source SHA-256 · page offsets · file hashes" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#036C70;strokeWidth=2;fontSize=11;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=60;spacingRight=6;image=img/lib/azure2/general/Code.svg;imageWidth=40;imageHeight=40;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="50" y="340" width="330" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="doc" value="&amp;lt;document&amp;gt;/" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#107C10;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontStyle=1;fontSize=14;fontColor=#107C10;spacingTop=8;">
+          <mxGeometry x="420" y="140" width="1040" height="510" as="geometry" />
+        </mxCell>
+        <mxCell id="d1" value="&lt;b&gt;README.md&lt;/b&gt;&lt;br&gt;at-a-glance table · structure overview · section index" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#107C10;strokeWidth=2;fontSize=11;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=60;spacingRight=6;image=img/lib/azure2/general/File.svg;imageWidth=40;imageHeight=40;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="440" y="190" width="480" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="secs" value="sections/" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#F1FAF1;strokeColor=#107C10;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontStyle=1;fontSize=14;fontColor=#107C10;spacingTop=8;">
+          <mxGeometry x="440" y="290" width="480" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="s1" value="&lt;b&gt;001-front-matter.md&lt;/b&gt;" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#107C10;strokeWidth=2;fontSize=11;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=50;spacingRight=6;image=img/lib/azure2/general/File.svg;imageWidth=30;imageHeight=30;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="460" y="340" width="440" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="s2" value="&lt;b&gt;002-1-overview.md&lt;/b&gt;&lt;br&gt;frontmatter: source + page range · prev/next" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#107C10;strokeWidth=2;fontSize=11;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=50;spacingRight=6;image=img/lib/azure2/general/File.svg;imageWidth=30;imageHeight=30;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="460" y="420" width="440" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" value="&lt;b&gt;…&lt;/b&gt; one file per chapter, split again if &amp;gt; 40,000 chars" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#107C10;strokeWidth=2;fontSize=11;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=50;spacingRight=6;image=img/lib/azure2/general/File.svg;imageWidth=30;imageHeight=30;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="460" y="510" width="440" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="figs" value="assets/figures/" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#F3F9FD;strokeColor=#0078D4;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontStyle=1;fontSize=14;fontColor=#0078D4;spacingTop=8;">
+          <mxGeometry x="950" y="190" width="490" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="f1" value="&lt;b&gt;fig-p0012-1.png&lt;/b&gt;&lt;br&gt;original crop · name carries the ORIGINAL page" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#0078D4;strokeWidth=2;fontSize=11;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=60;spacingRight=6;image=img/lib/azure2/general/Image.svg;imageWidth=40;imageHeight=40;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="970" y="240" width="450" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="strc" value="structured/ — only when extractors are enabled" vertex="1" parent="1" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#F7F3FB;strokeColor=#5C2D91;dashed=1;strokeWidth=1.5;verticalAlign=top;align=center;fontStyle=1;fontSize=14;fontColor=#5C2D91;spacingTop=8;">
+          <mxGeometry x="950" y="360" width="490" height="270" as="geometry" />
+        </mxCell>
+        <mxCell id="x1" value="&lt;b&gt;registers.json / .md&lt;/b&gt;&lt;br&gt;bit-field diagram + field table per register" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=2;fontSize=11;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=50;spacingRight=6;image=img/lib/azure2/general/Code.svg;imageWidth=30;imageHeight=30;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="970" y="410" width="450" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="x2" value="&lt;b&gt;pins.json / .md&lt;/b&gt;" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=2;fontSize=11;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=50;spacingRight=6;image=img/lib/azure2/general/Code.svg;imageWidth=30;imageHeight=30;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="970" y="485" width="450" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="x3" value="&lt;b&gt;electrical.json / .md&lt;/b&gt;&lt;br&gt;min / typ / max parsed to numbers" vertex="1" parent="1" style="shape=label;whiteSpace=wrap;html=1;rounded=1;arcSize=10;fillColor=#ffffff;strokeColor=#5C2D91;strokeWidth=2;fontSize=11;fontColor=#323130;align=left;verticalAlign=middle;spacingLeft=50;spacingRight=6;image=img/lib/azure2/general/Code.svg;imageWidth=30;imageHeight=30;imageAlign=left;imageVerticalAlign=middle;">
+          <mxGeometry x="970" y="555" width="450" height="60" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
