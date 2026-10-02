@@ -1,14 +1,40 @@
+[README](../README.md) › [docs index](./00-reproduce-this-demo.md) › 03 Deployment
+
 # 03 — Deployment
+
+<p>
+<img src="./assets/icons/azure-devops.svg" width="40" alt="Azure Developer CLI"/>&nbsp;
+<img src="./assets/icons/resource-group.svg" width="40" alt="Resource group"/>&nbsp;
+<img src="./assets/icons/ai-search.svg" width="40" alt="Azure AI Search"/>&nbsp;
+<img src="./assets/icons/foundry.svg" width="40" alt="Microsoft Foundry"/>&nbsp;
+<img src="./assets/icons/key-vault.svg" width="40" alt="Key Vault"/>&nbsp;
+<img src="./assets/icons/container-apps.svg" width="40" alt="Container Apps"/>&nbsp;
+<img src="./assets/icons/code.svg" width="40" alt="VS Code"/>
+</p>
+
+![Version](./assets/badges/version.svg) ![Azd up](./assets/badges/azd-up.svg) ![Static-only](./assets/badges/static-only.svg) ![Live-tested](./assets/badges/live-tested.svg) ![Optional](./assets/badges/optional.svg)
 
 Step-by-step build of the Developer Docs MCP Knowledge Base pattern via Bicep/IaC. Assumes all of [02-prerequisites.md](./02-prerequisites.md) is complete.
 
+## At a glance
+
+| | Question | Answer |
+|---|---|---|
+| <img src="./assets/icons/azure-devops.svg" width="24" alt=""/> | **Fastest path** | `azd up` — Phases 1–2 in one command ![Static-only](./assets/badges/static-only.svg) |
+| <img src="./assets/icons/powershell.svg" width="24" alt=""/> | **Reference path** | `deploy.ps1` plus the phases below ![Live-tested](./assets/badges/live-tested.svg) |
+| <img src="./assets/icons/gear.svg" width="24" alt=""/> | **No IaC allowed?** | [03b-manual-deployment.md](./03b-manual-deployment.md) — Portal + imperative CLI |
+| <img src="./assets/icons/container-apps.svg" width="24" alt=""/> | **Custom wrapper** | Phase 4, optional ![Optional](./assets/badges/optional.svg) |
+
+> [!TIP]
 > **Don't want to use Bicep?** See [03b-manual-deployment.md](./03b-manual-deployment.md) for a complete Azure Portal + imperative CLI alternative that produces the same resources — useful when a customer's environment doesn't allow IaC deployments.
 
+> [!TIP]
 > **Fastest path: `azd up`.** One command provisions everything in Phases 1–2 (resource group,
 > all four model deployments, `demo-ids.local.json`, the Key Vault secret) and can ingest a corpus
 > too. See [Fast path — azd up](#fast-path--azd-up) below. The phases after it are the
 > `deploy.ps1` path and the reference for what azd does.
 
+> [!NOTE]
 > **Build order matters.** Phases are sequential — each depends on artifacts from the prior phase. For the full "clone and stand up from scratch" experience with time budgets, see [docs/00-reproduce-this-demo.md](./00-reproduce-this-demo.md).
 
 ---
@@ -41,11 +67,16 @@ azd provision --preview
 azd up
 ```
 
-| Step | What azd runs | Same as |
-|---|---|---|
-| preprovision hook | Environment-name guard; `az` must match the azd subscription/tenant; soft-deleted Foundry account purged (`DEMO_PURGE_SOFT_DELETED=true`) or reported | Phase 0 + `deploy.ps1`'s soft-delete check |
-| provision | `infra/azd.bicep`: resource group + **the same `main.bicep`** (Storage, Foundry + project, `embedding` · `chat` · `vision` · `sol`, AI Search, Key Vault, RBAC, optional Container App) | Phase 1 and the model step of Phase 2 |
-| postprovision hook | Writes `demo-ids.local.json` from the outputs, stores the Search admin key in Key Vault, ingests `DEMO_CORPUS_DIR` if set | `deploy.ps1`'s tail + Phase 2 §§ 2.2–2.4 |
+> [!WARNING]
+> `azd` provisions with its **own** login while the hooks and scripts use `az`. Sign **both** in to the demo tenant explicitly (`azd auth login --tenant-id`, `az login --tenant`) and set `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID` in the azd environment — never rely on whichever account is ambient. The `preprovision` hook stops if `az` does not match the azd subscription/tenant.
+
+### Hooks
+
+| Hook | | What azd runs | Same as |
+|---|---|---|---|
+| preprovision hook | <img src="./assets/icons/entra-id.svg" width="24" alt=""/> | Environment-name guard; `az` must match the azd subscription/tenant; soft-deleted Foundry account purged (`DEMO_PURGE_SOFT_DELETED=true`) or reported | Phase 0 + `deploy.ps1`'s soft-delete check |
+| provision | <img src="./assets/icons/resource-group.svg" width="24" alt=""/> | `infra/azd.bicep`: resource group + **the same `main.bicep`** (Storage, Foundry + project, `embedding` · `chat` · `vision` · `sol`, AI Search, Key Vault, RBAC, optional Container App) | Phase 1 and the model step of Phase 2 |
+| postprovision hook | <img src="./assets/icons/key-vault.svg" width="24" alt=""/> | Writes `demo-ids.local.json` from the outputs, stores the Search admin key in Key Vault, ingests `DEMO_CORPUS_DIR` if set | `deploy.ps1`'s tail + Phase 2 §§ 2.2–2.4 |
 
 Every setting — region, resource group, models, capacities, SKU, hook behaviour — is an azd
 environment variable listed in [12-configuration-reference.md](./12-configuration-reference.md).
@@ -64,14 +95,14 @@ with the same names works).
 
 ## Phase overview
 
-| Phase | What you build | ~Time | Validation at end |
-|---|---|---|---|
-| 0 | Authenticate to the intended tenant + subscription | 2 min | `az account show` matches target |
-| 1 | Foundation resources (RG, Storage, Key Vault, Foundry + project, Search) via Bicep | 20-40 min | All resources `Succeeded`; RBAC assigned |
-| 2 | Route the corpus by page count, build **both** ingestion tiers (all four model deployments now come from Phase 1's Bicep) | 20 min setup + ingestion | Both indexers `success`; index has rows from every tier routed to |
-| 3 | Knowledge Base + verify the native MCP endpoint | 10 min | Retrieve call returns grounded, cited passages |
-| 4 | Optional custom wrapper MCP server | 45 min | Container App responds to an MCP `tools/list` call |
-| 5 | Wire GitHub Copilot / VS Code | 15 min | Copilot Chat (agent mode) answers a corpus question with a citation |
+| Phase | | What you build | ~Time | Gate |
+|---|---|---|---|---|
+| **0** | <img src="./assets/icons/entra-id.svg" width="24" alt=""/> | Authenticate to the intended tenant + subscription | 2 min | ☐ `az account show` matches target |
+| **1** | <img src="./assets/icons/resource-group.svg" width="24" alt=""/> | Foundation resources (RG, Storage, Key Vault, Foundry + project, Search) via Bicep | 20-40 min | ☐ All resources `Succeeded`; RBAC assigned |
+| **2** | <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | Route the corpus by page count, build **both** ingestion tiers (all four model deployments now come from Phase 1's Bicep) | 20 min setup + ingestion | ☐ Both indexers `success`; index has rows from every tier routed to |
+| **3** | <img src="./assets/icons/foundry.svg" width="24" alt=""/> | Knowledge Base + verify the native MCP endpoint | 10 min | ☐ Retrieve call returns grounded, cited passages |
+| **4** | <img src="./assets/icons/container-apps.svg" width="24" alt=""/> | Optional custom wrapper MCP server ![Optional](./assets/badges/optional.svg) | 45 min | ☐ Container App responds to an MCP `tools/list` call |
+| **5** | <img src="./assets/icons/code.svg" width="24" alt=""/> | Wire GitHub Copilot / VS Code | 15 min | ☐ Copilot Chat (agent mode) answers a corpus question with a citation |
 
 **Total hands-on time: ~1.5 hours.** Wall-clock is dominated by **ingestion**, which scales
 with the corpus: Tier CU is fast, but Tier DI+ makes one vision call per extracted figure and
@@ -82,7 +113,14 @@ in the reference build.
 
 ## Phase 0 — Authenticate to the right tenant
 
-> **Multi-tenant safety.** The active `az`/`azd` account drifts between tenants. Set it explicitly before building — never trust the ambient login.
+> [!WARNING]
+> **Multi-tenant safety.** The active `az`/`azd` account drifts between tenants. Set it explicitly before building — never trust the ambient login. Pass `--tenant` when acquiring tokens and `--subscription` on resource commands; for `azd`, run `azd auth login --tenant-id` and set `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID` before `azd up`.
+
+| Step | | Action | Gate |
+|---|---|---|---|
+| **0.1** | <img src="./assets/icons/entra-id.svg" width="24" alt=""/> | Verify the current tenant/subscription | ☐ output inspected |
+| **0.2** | <img src="./assets/icons/subscription.svg" width="24" alt=""/> | `az login --tenant` + `az account set` if it does not match | ☐ intended target selected |
+| **0.3** | <img src="./assets/icons/gear.svg" width="24" alt=""/> | Re-verify before deploying anything | ☐ tenant **and** subscription match |
 
 ```bash
 # 1. Verify which tenant/subscription az is currently pointed at
@@ -105,12 +143,19 @@ az account show --query "{tenant:tenantId, subscription:id, name:name}" -o table
 
 ## Phase 1 — Foundation resources
 
+| Step | | Action | Gate |
+|---|---|---|---|
+| **1.1** | <img src="./assets/icons/resource-group.svg" width="24" alt=""/> | Create the resource group (optional — `deploy.ps1` does it) | ☐ group exists |
+| **1.2** | <img src="./assets/icons/foundry.svg" width="24" alt=""/> | Deploy the Bicep template (`deploy.ps1`) | ☐ deployment `Succeeded` |
+| **1.3** | <img src="./assets/icons/entra-roles.svg" width="24" alt=""/> | Confirm RBAC wiring | ☐ role assignments listed |
+
 ### 1.1 Create the resource group
 
 ```bash
 az group create --name rg-ddmcp-dev-eastus --location eastus
 ```
 
+> [!NOTE]
 > `deploy.ps1` creates the resource group for you if it does not exist, so this step is
 > optional — it is here for the manual/portal path.
 
@@ -155,6 +200,14 @@ tiers in **one** index. See [01-architecture.md](./01-architecture.md#ingestion-
 design and [08-extraction-tier-comparison.md](./08-extraction-tier-comparison.md) for the
 measured justification and cost.
 
+| Step | | Action | Gate |
+|---|---|---|---|
+| **2.1** | <img src="./assets/icons/azure-openai.svg" width="24" alt=""/> | Frontier model deployments (created by the Bicep) | ☐ `vision` and `sol` serving |
+| **2.2** | <img src="./assets/icons/file.svg" width="24" alt=""/> | Route the corpus (`--plan`, free) | ☐ tier split reviewed |
+| **2.3** | <img src="./assets/icons/blob-block.svg" width="24" alt=""/> | Upload into the tier prefixes (`--upload --split`) | ☐ blobs under `raw/cu/` and/or `raw/di/` |
+| **2.4** | <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | Build both tiers (`--build`) | ☐ indexers started |
+| **2.5** | <img src="./assets/icons/monitor.svg" width="24" alt=""/> | Confirm ingestion (`--status`) | ☐ both indexers `success` |
+
 ### 2.1 Frontier model deployments (now created by the Bicep)
 
 Phase 1 (and `azd up`) creates `vision` and `sol` alongside `embedding` and `chat`, so there is
@@ -162,6 +215,9 @@ nothing to do here by default. Create them by hand only if you deployed with
 `deployHybridModels=false` / `DEPLOY_HYBRID_MODELS=false` (for example because the models
 already exist). Names must match `demo-ids.local.json` (`visionDeployment`,
 `frontierDeployment`):
+
+<details>
+<summary><b>The two <code>az cognitiveservices</code> commands (only if <code>deployHybridModels=false</code>)</b></summary>
 
 ```bash
 # Figure verbalization, BOTH tiers. Deliberately a NON-reasoning model: the
@@ -181,6 +237,9 @@ az cognitiveservices account deployment create -n <foundry> -g <rg> --deployment
 az cognitiveservices account deployment create -n <foundry> -g <rg> --deployment-name sol --model-name gpt-5.6-sol --model-version 2026-07-09 --model-format OpenAI --sku-name GlobalStandard --sku-capacity 200
 ```
 
+</details>
+
+> [!WARNING]
 > A brand-new deployment takes a few minutes to become usable, and the failure looks like
 > three different problems depending on which skill hits it first:
 > - Content Understanding: `DeploymentIdNotFound` — *"the OpenAI deployment 'x' does not exist"*
@@ -270,11 +329,17 @@ payloads — lives in
 [docs/06-mcp-endpoint-and-fallback-server.md](./06-mcp-endpoint-and-fallback-server.md). This
 phase is the short version.*
 
+| Step | | Action | Gate |
+|---|---|---|---|
+| **3.1** | <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | Knowledge Base `kb-hybrid` created by `--build` | ☐ `knowledgebases/kb-hybrid` returns 200 |
+| **3.2** | <img src="./assets/icons/code.svg" width="24" alt=""/> | Verify the native MCP endpoint ![Public preview](./assets/badges/public-preview.svg) | ☐ `--check-mcp-endpoint` succeeds |
+
 ### 3.1 The Knowledge Base
 
 `hybrid_ingest.py --build` already created `kb-hybrid` over the unified index with
 `outputMode: extractiveData`.
 
+> [!IMPORTANT]
 > **`extractiveData` is required, not a preference.** The native MCP tool accepts only a
 > `queries` array and cannot request reference source data, so under `answerSynthesis` the
 > client receives a synthesised *"I cannot access external documents"* non-answer while direct
@@ -301,6 +366,11 @@ wrapper is optional and was **not** needed in the reference build.
 
 *Full reference in [docs/06-mcp-endpoint-and-fallback-server.md](./06-mcp-endpoint-and-fallback-server.md). This wrapper is not required for a working demo — see § 4 there for why you might still want it (token lifecycle, custom processing, network controls).*
 
+| Step | | Action | Gate |
+|---|---|---|---|
+| **4.1** | <img src="./assets/icons/container-apps.svg" width="24" alt=""/> | Deploy with `-DeployFallbackServer` ![Optional](./assets/badges/optional.svg) | ☐ Container Apps environment provisioned |
+| **4.2** | <img src="./assets/icons/container-registry.svg" width="24" alt=""/> | Build and deploy the image (`deploy_mcp_server.ps1`) | ☐ `/mcp` returns `tools/list` |
+
 ```bash
 cd ../infra
 ./deploy.ps1 -Environment $Env -Region $Region -ResourceGroup "rg-ddmcp-$Env-$Region" -DeployFallbackServer
@@ -321,6 +391,15 @@ cd ../scripts
 
 *Full reference in [docs/07-github-copilot-mcp-client-setup.md](./07-github-copilot-mcp-client-setup.md).*
 
+| Step | | Action | Gate |
+|---|---|---|---|
+| **5.1** | <img src="./assets/icons/file.svg" width="24" alt=""/> | Add `.vscode/mcp.json` pointing at the validated endpoint (native from Phase 3, or fallback from Phase 4) | ☐ file saved |
+| **5.2** | <img src="./assets/icons/code.svg" width="24" alt=""/> | Reload the window; confirm the MCP server is connected | ☐ listed in the Copilot Chat tools |
+| **5.3** | <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | Ask a corpus question in agent mode | ☐ answer cites a source document + heading path |
+
+> [!NOTE]
+> The steps above, in detail:
+
 1. Add a `.vscode/mcp.json` in the target workspace pointing at whichever endpoint you validated (native from Phase 3, or fallback from Phase 4)
 2. Reload the VS Code window; confirm the MCP server shows as connected in the Copilot Chat tools list
 3. Ask a corpus question in Copilot Chat (agent mode) and confirm the response cites a source document + heading path
@@ -334,6 +413,15 @@ cd ../scripts
 
 ## Post-deployment checklist
 
+| Check | | Why |
+|---|---|---|
+| Both tiers contributing | <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | The `extractionTier` facet, not row count, proves it |
+| Cost alert | <img src="./assets/icons/cost-management.svg" width="24" alt=""/> | AI Search Basic and the model deployments bill continuously |
+| Teardown planned | <img src="./assets/icons/resource-group.svg" width="24" alt=""/> | `--teardown` then `az group delete` |
+
+> [!CAUTION]
+> Do not leave a finished demo running — AI Search Basic and the model deployments bill continuously. Tear down when it is not in use.
+
 - [ ] All Phase 0-5 validation boxes checked
 - [ ] **Both tiers verified contributing** — check the `extractionTier` facet, not just row count
 - [ ] Indexer schedule configured if the corpus will be updated regularly (or documented as manual re-run)
@@ -346,4 +434,6 @@ cd ../scripts
 
 ---
 
-*Last updated: 2026-09-30*
+Next: [03b - Manual deployment](./03b-manual-deployment.md) →
+
+*Last updated: 2026-10-02*

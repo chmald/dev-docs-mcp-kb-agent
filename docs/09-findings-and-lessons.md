@@ -1,9 +1,25 @@
+[README](../README.md) › [docs index](./00-reproduce-this-demo.md) › 09 Findings and lessons
+
 # 09 — Findings and lessons
+
+<p>
+  <img src="./assets/icons/ai-search.svg" width="40" alt="Azure AI Search"/>&nbsp;
+  <img src="./assets/icons/document-intelligence.svg" width="40" alt="Document Intelligence"/>&nbsp;
+  <img src="./assets/icons/foundry.svg" width="40" alt="Foundry"/>&nbsp;
+  <img src="./assets/icons/azure-openai.svg" width="40" alt="Azure OpenAI"/>&nbsp;
+  <img src="./assets/icons/storage.svg" width="40" alt="Storage"/>&nbsp;
+  <img src="./assets/icons/key-vault.svg" width="40" alt="Key Vault"/>&nbsp;
+  <img src="./assets/icons/policy.svg" width="40" alt="Azure Policy"/>
+</p>
+
+![Live-tested](./assets/badges/live-tested.svg) ![GA](./assets/badges/ga.svg) ![Public preview](./assets/badges/public-preview.svg) ![version](./assets/badges/version.svg)
 
 Everything two clean-room rebuilds surfaced, in one place. Each entry states the **symptom you
 will actually see**, the **real cause** (often different from what the error says), and the
-**fix**.
+**fix**. It is for anyone about to build, debug or sell this pattern and wants the shortcuts
+before hitting the same walls.
 
+> [!NOTE]
 > **Why this document exists.** This pattern was authored, reviewed for accuracy against
 > Microsoft Learn, and had its API contracts validated — three passes — before it was ever
 > deployed. The first real deployment still hit **nine** defects, six of them hard blockers. A
@@ -12,6 +28,42 @@ will actually see**, the **real cause** (often different from what the error say
 >
 > The generalisable lesson: **a pattern is not customer-ready until it has been built from
 > zero, twice.** Once proves it can work; twice proves the documentation is what made it work.
+
+## At a glance
+
+Seven families of finding, one card each. The detailed entries follow in the same order.
+
+| | Family | What bites you | Jump to |
+|---|---|---|---|
+| <img src="./assets/icons/alerts.svg" width="24" alt=""/> | **Failures that lie to you** | The error names a plausible-but-wrong cause (a "timeout" that is really throttling) | [below](#failures-that-lie-to-you) |
+| <img src="./assets/icons/monitor.svg" width="24" alt=""/> | **Silent failures** | Everything reports success; zero figures, stale rows, or a dropped property | [below](#silent-failures) |
+| <img src="./assets/icons/resource-group.svg" width="24" alt=""/> | **Teardown and rebuild** | Soft-deleted accounts and in-flight deletes block a redeploy | [below](#teardown-and-rebuild) |
+| <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | **Ingestion at scale** | One failed document halts a run; split size follows figure density | [below](#ingestion-at-scale) |
+| <img src="./assets/icons/policy.svg" width="24" alt=""/> | **Environment constraints** | Regional capacity and governed-subscription policy | [below](#environment-constraints) |
+| <img src="./assets/icons/file.svg" width="24" alt=""/> | **Corrections to earlier guidance** | Confident claims later disproved by measurement | [below](#corrections-to-earlier-guidance) |
+| <img src="./assets/icons/code.svg" width="24" alt=""/> | **Testing lessons** | A golden set that only checks *which document* hides degraded passages | [below](#testing-lessons) |
+
+### Symptom → real cause cheat sheet
+
+| | Error you see | Real cause | Fix |
+|---|---|---|---|
+| <img src="./assets/icons/azure-openai.svg" width="24" alt=""/> | Vision skill `did not execute within the time limit '00:00:30'` | **Request-rate throttling**, not a slow model | Provision request headroom, then split documents |
+| <img src="./assets/icons/azure-openai.svg" width="24" alt=""/> | `Web Api skill response is invalid` → HTTP 404 | The `api-version` query parameter is missing from the skill `uri` | Always include `?api-version=...` |
+| <img src="./assets/icons/foundry.svg" width="24" alt=""/> | `DeploymentIdNotFound` on a deployment that exists | The new deployment is **not serving yet** | Verify with a direct chat call, then reset and re-run |
+| <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | `Parsing failure: unexpected '='` | `='literal'` used in an index projection mapping | Materialise the constant with a `ConditionalSkill` |
+
+## The numbers that matter
+
+The limits and measurements that shaped the design, on one page. The same figures appear in [08](./08-extraction-tier-comparison.md) and in the entries below.
+
+[![Numbers that matter: the measured limits behind the design](./assets/numbers-that-matter.png)](./assets/numbers-that-matter.png)
+
+<sub>Editable source: [`assets/numbers-that-matter.drawio`](./assets/numbers-that-matter.drawio) - regenerate with `python scripts/export_diagrams.py docs/assets`.</sub>
+
+> [!TIP]
+> If you only carry one lesson into a customer conversation, make it this one: **when a service imposes a
+> hard per-call timeout with a total-failure mode, select on latency _variance_, not mean latency — and
+> benchmark more than one input.** See [Corrections to earlier guidance](#corrections-to-earlier-guidance).
 
 **Navigation**
 
@@ -49,7 +101,9 @@ exhaust the ceiling, requests queue, and individual calls exceed the fixed 30-se
 az cognitiveservices account deployment show -n <foundry> -g <rg> --deployment-name vision --query "{cap:sku.capacity, limits:properties.rateLimits[].{key:key,count:count}}" -o json
 ```
 
-**Capacity is a reliability setting for this deployment, not a cost setting.**
+> [!IMPORTANT]
+> **Capacity is a reliability setting for this deployment, not a cost setting.** A timeout here is
+> almost never a slow model — check the requests-per-minute ceiling before changing the model.
 
 ### `Web Api skill response is invalid` → HTTP 404
 
@@ -154,6 +208,10 @@ versions reject. Note this is **API-version** behaviour, not model-family behavi
 
 ### Orphaned index rows after a corpus change
 
+> [!WARNING]
+> Deleting a blob does **not** remove its rows. A changed or re-split corpus silently
+> double-represents content unless you act.
+
 Deleting a blob does **not** remove its rows. The indexer only adds and updates unless a
 deletion detection policy is configured, so a changed or re-split corpus leaves stale rows and
 silently double-represents content.
@@ -208,6 +266,10 @@ would mask a genuinely broken corpus.
 
 ### Retrying failed documents
 
+> [!CAUTION]
+> **`--reset` is the only reliable method** — and it reprocesses and re-bills the whole corpus.
+> Budget for it before you press the button.
+
 **`--reset` is the only reliable method.** Change tracking treats an attempted-and-failed
 document as *seen*, so a plain re-run reports `processed=0 failed=0` and skips it.
 
@@ -243,6 +305,16 @@ before a POC rather than discovering it during one.
 ---
 
 ## Environment constraints
+
+| | Constraint | Symptom | Workaround |
+|---|---|---|---|
+| <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | Regional capacity ≠ availability | `InsufficientResourcesAvailable` on AI Search Basic | Pick another region (`eastus` succeeded where `eastus2` did not) |
+| <img src="./assets/icons/policy.svg" width="24" alt=""/> | Governed subscription forces `publicNetworkAccess: Disabled` | Policy silently reverts an explicit re-enable | Network Security Perimeter, `SecuredByPerimeter` via REST |
+| <img src="./assets/icons/foundry.svg" width="24" alt=""/> | Content Understanding model allowlist lags the Foundry catalog | Rejection error enumerates the current ceiling | No longer a constraint here — figures use the ![GA](./assets/badges/ga.svg) vision skill |
+
+> [!NOTE]
+> These three are environmental, not defects in the pattern: they depend on the subscription,
+> region and policy you deploy into. Check them during region selection, before the first deploy.
 
 ### Regional capacity ≠ regional availability
 
@@ -298,6 +370,10 @@ benchmark measures the mean; the ceiling punishes the tail.
 
 ### A golden set that only checks *which document* cannot detect a degraded passage
 
+> [!IMPORTANT]
+> A **4/4 golden-set pass** was declared "working" while more than a third of figure-bearing
+> chunks were empty. Test what landed in the index, not only what came back from a query.
+
 The first build passed **4/4** on its golden set and was declared working. Auditing the actual
 index content found:
 
@@ -329,4 +405,6 @@ orphaned table *tails*, which undercounted the very defect being measured.
 
 ---
 
-*Last updated: 2026-08-24*
+Next: [10 - Repo corpus export](./10-repo-corpus-export.md) →
+
+*Last updated: 2026-10-02*

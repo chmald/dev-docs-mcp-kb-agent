@@ -65,7 +65,7 @@ def export(exe: str, src: Path, scale: float, border: int) -> list[Path]:
         cmd = [exe, "--export", "--format", "png", "--scale", str(scale), "--border", str(border),
                "--output", str(png)]
         if page is not None:
-            cmd += ["--page-index", str(page)]
+            cmd += ["--page-index", str(page + 1)]  # draw.io CLI page index is 1-based
         cmd.append(str(src))
         # --no-sandbox is needed when running as root on Linux CI; harmless elsewhere.
         if sys.platform.startswith("linux"):

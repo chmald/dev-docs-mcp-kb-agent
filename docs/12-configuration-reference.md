@@ -1,16 +1,44 @@
+[README](../README.md) › [docs index](./00-reproduce-this-demo.md) › 12 Configuration reference
+
 # 12 — Configuration reference
+
+<p>
+  <img src="./assets/icons/gear.svg" width="40" alt="Configuration"/>&nbsp;
+  <img src="./assets/icons/subscription.svg" width="40" alt="Subscription"/>&nbsp;
+  <img src="./assets/icons/foundry-models.svg" width="40" alt="Foundry models"/>&nbsp;
+  <img src="./assets/icons/azure-openai.svg" width="40" alt="Azure OpenAI"/>&nbsp;
+  <img src="./assets/icons/ai-search.svg" width="40" alt="Azure AI Search"/>&nbsp;
+  <img src="./assets/icons/key-vault.svg" width="40" alt="Key Vault"/>&nbsp;
+  <img src="./assets/icons/container-apps.svg" width="40" alt="Container Apps"/>&nbsp;
+  <img src="./assets/icons/storage.svg" width="40" alt="Storage"/>
+</p>
+
+![Default](./assets/badges/default.svg) ![Optional](./assets/badges/optional.svg) ![Opt-in](./assets/badges/opt-in.svg) ![version](./assets/badges/version.svg)
 
 Every setting this pattern reads, where you set it, its default, and what consumes it. Use it to
 change a model or capacity, deploy into an existing resource group, point the scripts at a
 different knowledge base, or retarget the pattern at another corpus — without reading code.
 
+> [!IMPORTANT]
 > **Rule of thumb.** Deployment settings are **azd environment variables** (`azd env set …`).
 > Script settings are **keys in `demo-ids.local.json`**. Secrets are **never** in either: the
 > Search admin key lives in Key Vault, and everything else authenticates with your Entra login.
 
+## At a glance
+
+| | Group | Section | Set with |
+|---|---|---|---|
+| <img src="./assets/icons/subscription.svg" width="24" alt=""/> | Target and identity | [1.1](#11-target-and-identity) | `azd env set` |
+| <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | Platform (search SKU, wrapper) | [1.2](#12-platform) | `azd env set` |
+| <img src="./assets/icons/azure-openai.svg" width="24" alt=""/> | Models and capacity | [1.3](#13-models) | `azd env set` |
+| <img src="./assets/icons/powershell.svg" width="24" alt=""/> | Hook behaviour | [1.4](#14-hook-behaviour) | `azd env set` |
+| <img src="./assets/icons/resource-group.svg" width="24" alt=""/> | azd outputs | [1.5](#15-outputs-written-back-by-azd) | written for you |
+| <img src="./assets/icons/code.svg" width="24" alt=""/> | Script configuration | [3](#3--demo-idslocaljson-script-configuration) | `demo-ids.local.json` |
+| <img src="./assets/icons/container-apps.svg" width="24" alt=""/> | Runtime environment | [4](#4--process-environment-variables-runtime) | shell / Container App |
+
 [![Configuration flow](./assets/configuration-flow.png)](./assets/configuration-flow.png)
 
-<sub>Editable source: [`assets/configuration-flow.drawio`](./assets/configuration-flow.drawio).</sub>
+<sub>Editable source: [`assets/configuration-flow.drawio`](./assets/configuration-flow.drawio) - regenerate with `python scripts/export_diagrams.py docs/assets`.</sub>
 
 | Where | Set with | Read by | Committed? |
 |---|---|---|---|
@@ -31,6 +59,8 @@ Set before `azd up` / `azd provision`. Values marked *azd* are managed by azd it
 
 ### 1.1 Target and identity
 
+<img src="./assets/icons/subscription.svg" width="24" alt=""/> **Group: target and identity** — where the deployment lands and who it is deployed as.
+
 | Variable | Default | Effect |
 |---|---|---|
 | `AZURE_ENV_NAME` | *azd* — chosen at `azd env new <name>` | Environment token in every resource name. **1–12 lowercase letters/digits**: Storage, Key Vault and the Foundry subdomain reject anything else (the preprovision hook enforces it) |
@@ -44,12 +74,16 @@ Set before `azd up` / `azd provision`. Values marked *azd* are managed by azd it
 
 ### 1.2 Platform
 
+<img src="./assets/icons/ai-search.svg" width="24" alt=""/> **Group: platform** — the search service and the optional wrapper.
+
 | Variable | Default | Effect |
 |---|---|---|
 | `SEARCH_SKU` | `basic` | `basic` · `standard` · `standard2` · `standard3`. Basic is the floor for semantic ranker + knowledge bases; use Standard for production |
 | `DEPLOY_FALLBACK_SERVER` | `false` | `true` adds the Container Apps environment, registry and app for the optional MCP wrapper ([06](./06-mcp-endpoint-and-fallback-server.md)) |
 
 ### 1.3 Models
+
+<img src="./assets/icons/azure-openai.svg" width="24" alt=""/> **Group: models** — four deployments on the Foundry account.
 
 All four deployments are created **one after another** on the Foundry account (concurrent
 deployment operations are throttled). Capacity is in thousands of tokens per minute; requests
@@ -67,10 +101,17 @@ per minute scale with it.
 | `FRONTIER_MODEL_NAME` · `FRONTIER_MODEL_VERSION` | `gpt-5.6-sol` / `2026-07-09` | `sol` | Knowledge-base query planning (no timeout pressure) |
 | `FRONTIER_CAPACITY` | `200` | | |
 
+> [!WARNING]
+> **`VISION_CAPACITY` is a reliability setting.** Lowering it to save quota turns into a
+> misleading 30-second timeout during ingestion — see [09](./09-findings-and-lessons.md#failures-that-lie-to-you).
+
+> [!NOTE]
 > **Model currency.** Model names and versions move; check the live Foundry catalog and the
 > retirement schedule before a customer build, and override here rather than editing Bicep.
 
 ### 1.4 Hook behaviour
+
+<img src="./assets/icons/powershell.svg" width="24" alt=""/> **Group: hooks** — the preprovision and postprovision scripts.
 
 | Variable | Default | Read by | Effect |
 |---|---|---|---|
@@ -80,6 +121,8 @@ per minute scale with it.
 | `DEMO_PYTHON` | `python` | postprovision | Interpreter for ingestion — point it at your virtual environment, e.g. `.venv/Scripts/python` |
 
 ### 1.5 Outputs written back by azd
+
+<img src="./assets/icons/resource-group.svg" width="24" alt=""/> **Group: outputs** — resource identifiers captured after provisioning.
 
 Written to `.azure/<env>/.env` after provisioning and copied into `demo-ids.local.json` by the
 postprovision hook. Don't set these yourself.
@@ -103,7 +146,7 @@ postprovision hook. Don't set these yourself.
 | `-Environment` | `dev` | `AZURE_ENV_NAME` |
 | `-Region` | `eastus2` | `AZURE_LOCATION` |
 | `-ResourceGroup` | *required* | `AZURE_RESOURCE_GROUP` |
-| `-DeployFallbackServer` | off | `DEPLOY_FALLBACK_SERVER` |
+| `-DeployFallbackServer` | off ![Optional](./assets/badges/optional.svg) | `DEPLOY_FALLBACK_SERVER` |
 | `-WhatIf` | off | `azd provision --preview` |
 
 Model, capacity and SKU settings on this path come from `infra/main.parameters.json` and the
@@ -121,6 +164,8 @@ updates these and **preserves every other key**, so your hand-added tunables sur
 
 ### 3.2 Corpus block — the only corpus-specific settings
 
+<img src="./assets/icons/code.svg" width="24" alt=""/> **Group: corpus** — keys under `corpus` in `demo-ids.local.json`.
+
 | Key | Default | Read by | Effect |
 |---|---|---|---|
 | `corpus.displayName` | `document` (export: `reference documentation`) | `post_deploy_search.py`, `compare_extraction_tiers.py`, `export_repo_corpus.py` | Human name for the corpus in skill descriptions, reports and generated READMEs |
@@ -129,9 +174,11 @@ updates these and **preserves every other key**, so your hand-added tunables sur
 | `corpus.chunkSizeTokens` | `1500` | `hybrid_ingest.py` (Tier DI+), `post_deploy_search.py` | Split skill page length |
 | `corpus.chunkOverlapTokens` | `200` | same | Split skill overlap |
 | `corpus.sourceFileExtensions` | `[".pdf"]` | `upload_documents.py` | Accepted input types |
-| `corpus.exportExtractors` | `[]` (template: hardware set) | `export_repo_corpus.py` | `registers`, `pins`, `electrical` — set `[]` for any non-hardware corpus |
+| `corpus.exportExtractors` | `[]` (template: hardware set) ![Opt-in](./assets/badges/opt-in.svg) | `export_repo_corpus.py` | `registers`, `pins`, `electrical` — set `[]` for any non-hardware corpus |
 
 ### 3.3 Optional tunables (add the key only to change the default)
+
+<img src="./assets/icons/gear.svg" width="24" alt=""/> **Group: tunables** — every key here is ![Optional](./assets/badges/optional.svg); absent means the default applies.
 
 | Key | Default | Read by | Effect |
 |---|---|---|---|
@@ -140,12 +187,12 @@ updates these and **preserves every other key**, so your hand-added tunables sur
 | `chatModel` | `gpt-5-mini` | `post_deploy_search.py`, `compare_extraction_tiers.py` | Baseline knowledge-base model name |
 | `chatApiVersion` | `2025-04-01-preview` | `hybrid_ingest.py`, `export_repo_corpus.py` | Azure OpenAI API version for vision calls (required, or the skill 404s) |
 | `visionMaxTokens` | `1200` | `hybrid_ingest.py` | Completion budget per figure description |
-| `visionReasoningEffort` | unset | `hybrid_ingest.py` | Only for a reasoning vision model; non-reasoning deployments reject it |
+| `visionReasoningEffort` | unset ![Opt-in](./assets/badges/opt-in.svg) | `hybrid_ingest.py` | Only for a reasoning vision model; non-reasoning deployments reject it |
 | `cuChunkTokens` | `500` | `hybrid_ingest.py`, `compare_extraction_tiers.py` | Content Understanding chunk size |
 | `cuModelDeployment` / `cuModelName` | `cu-frontier` / `gpt-4.1` | `hybrid_ingest.py` | Reference only — CU's own figure feature is not used (see the code comment) |
 | `cuFigureModelName` | — | `compare_extraction_tiers.py` | A/B harness only |
 | `maxFailedItems` / `maxFailedItemsPerBatch` | `10` / `5` | `hybrid_ingest.py` | Indexer failure budget; never `-1`, which hides a broken corpus |
-| `knowledgeBaseOutputMode` | `extractiveData` | ingestion scripts | **Keep `extractiveData` for MCP clients** — `answerSynthesis` breaks the Copilot path |
+| `knowledgeBaseOutputMode` | `extractiveData` ![Default](./assets/badges/default.svg) | ingestion scripts | **Keep `extractiveData` for MCP clients** — `answerSynthesis` breaks the Copilot path |
 | `searchIndexName` | `idx-documents` | all | Base index name; the hybrid index appends `-hybrid` |
 | `searchSkillsetName`, `searchDataSourceName`, `searchIndexerName` | `skillset-documents`, `ds-documents-blob`, `ixr-documents` | baseline pipeline | Baseline object names |
 | `knowledgeBaseName`, `knowledgeSourceName` | `kb-documents`, `ks-documents` | baseline pipeline, harness | Baseline knowledge base (the hybrid uses `kb-hybrid` / `ks-hybrid`) |
@@ -160,11 +207,13 @@ updates these and **preserves every other key**, so your hand-added tunables sur
 
 ## 4 — Process environment variables (runtime)
 
+<img src="./assets/icons/container-apps.svg" width="24" alt=""/> **Group: runtime** — read by the optional MCP wrapper and the diagram exporter.
+
 | Variable | Default | Read by | Effect |
 |---|---|---|---|
 | `SEARCH_ENDPOINT` | *required* | `mcp_fallback_server.py` | Set by `deploy_mcp_server.ps1` on the Container App |
 | `SEARCH_API_KEY` | *required* | `mcp_fallback_server.py` | Key Vault reference on the Container App — never a literal |
-| `SEARCH_API_VERSION` | `2026-05-01-preview` | `mcp_fallback_server.py` | |
+| `SEARCH_API_VERSION` | `2026-05-01-preview` ![Search API](./assets/badges/search-api.svg) | `mcp_fallback_server.py` | |
 | `SEARCH_INDEX_NAME` | `idx-documents` | `mcp_fallback_server.py` | |
 | `KNOWLEDGE_BASE_NAME` / `KNOWLEDGE_SOURCE_NAME` | `kb-documents` / `ks-documents` | `mcp_fallback_server.py` | Point at `kb-hybrid` / `ks-hybrid` for the hybrid build |
 | `SEMANTIC_CONFIG_NAME` | `semantic-config` | `mcp_fallback_server.py` | Must match the index |
@@ -176,19 +225,23 @@ updates these and **preserves every other key**, so your hand-added tunables sur
 
 ## 5 — Recipes
 
-| Goal | Do this |
-|---|---|
-| Standard demo in a fresh subscription | `azd env new dev` → `azd env set AZURE_TENANT_ID …` → `azd env set AZURE_SUBSCRIPTION_ID …` → `azd env set AZURE_LOCATION eastus2` → `azd up` |
-| Infrastructure **and** a working knowledge base in one command | also `azd env set DEMO_CORPUS_DIR ./samples/corpus` and `azd env set DEMO_PYTHON .venv/Scripts/python` |
-| Region with tight model quota | `azd env set VISION_CAPACITY 300` (expect slower ingestion; split documents) and/or `FRONTIER_CAPACITY 100` |
-| Models already exist / created by hand | `azd env set DEPLOY_HYBRID_MODELS false` |
-| Existing resource group | `azd env set AZURE_RESOURCE_GROUP rg-my-existing` |
-| Redeploy after `azd down` without `--purge` | `azd env set DEMO_PURGE_SOFT_DELETED true` |
-| Production-sized search | `azd env set SEARCH_SKU standard` |
-| Different corpus domain | edit the `corpus` block (section 3.2); set `exportExtractors` to `[]` unless it's hardware |
-| See what would change | `azd provision --preview` |
-| Inspect current values | `azd env get-values` |
+Each row is a recipe card: the goal, then the commands.
+
+| | Goal | Do this |
+|---|---|---|
+| <img src="./assets/icons/subscription.svg" width="24" alt=""/> | Standard demo in a fresh subscription ![Default](./assets/badges/default.svg) | `azd env new dev` → `azd env set AZURE_TENANT_ID …` → `azd env set AZURE_SUBSCRIPTION_ID …` → `azd env set AZURE_LOCATION eastus2` → `azd up` |
+| <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | Infrastructure **and** a working knowledge base in one command | also `azd env set DEMO_CORPUS_DIR ./samples/corpus` and `azd env set DEMO_PYTHON .venv/Scripts/python` |
+| <img src="./assets/icons/azure-openai.svg" width="24" alt=""/> | Region with tight model quota | `azd env set VISION_CAPACITY 300` (expect slower ingestion; split documents) and/or `FRONTIER_CAPACITY 100` |
+| <img src="./assets/icons/foundry-models.svg" width="24" alt=""/> | Models already exist / created by hand | `azd env set DEPLOY_HYBRID_MODELS false` |
+| <img src="./assets/icons/resource-group.svg" width="24" alt=""/> | Existing resource group | `azd env set AZURE_RESOURCE_GROUP rg-my-existing` |
+| <img src="./assets/icons/key-vault.svg" width="24" alt=""/> | Redeploy after `azd down` without `--purge` | `azd env set DEMO_PURGE_SOFT_DELETED true` |
+| <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | Production-sized search | `azd env set SEARCH_SKU standard` |
+| <img src="./assets/icons/file.svg" width="24" alt=""/> | Different corpus domain | edit the `corpus` block (section 3.2); set `exportExtractors` to `[]` unless it's hardware |
+| <img src="./assets/icons/gear.svg" width="24" alt=""/> | See what would change | `azd provision --preview` |
+| <img src="./assets/icons/gear.svg" width="24" alt=""/> | Inspect current values | `azd env get-values` |
 
 ---
 
-*Last updated: 2026-09-30*
+Next: [README](../README.md) →
+
+*Last updated: 2026-10-02*

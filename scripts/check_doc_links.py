@@ -11,6 +11,7 @@ import re, pathlib, urllib.parse
 root = pathlib.Path(".")
 files = list(root.glob("*.md")) + list(root.glob("docs/*.md")) + list(root.glob("samples/*.md")) + list(root.glob("tests/*.md"))
 def slug(t):
+    t = re.sub(r"<[^>]+>", "", t)     # GitHub ignores inline HTML (icon <img>) in anchors
     t = t.strip().lower()
     t = re.sub(r"[^\w\s-]", "", t)   # drop punctuation incl. em dash
     return t.replace(" ", "-")        # each space -> one hyphen (GitHub behaviour)

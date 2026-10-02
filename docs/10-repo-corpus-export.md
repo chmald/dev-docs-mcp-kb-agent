@@ -1,12 +1,43 @@
+[README](../README.md) › [docs index](./00-reproduce-this-demo.md) › 10 Repository corpus export
+
 # 10 — Repository corpus export
+
+<p>
+  <img src="./assets/icons/document-intelligence.svg" width="40" alt="Document Intelligence"/>&nbsp;
+  <img src="./assets/icons/azure-openai.svg" width="40" alt="Azure OpenAI"/>&nbsp;
+  <img src="./assets/icons/file.svg" width="40" alt="Markdown files"/>&nbsp;
+  <img src="./assets/icons/folder.svg" width="40" alt="Repository folder"/>&nbsp;
+  <img src="./assets/icons/media-file.svg" width="40" alt="Figures"/>&nbsp;
+  <img src="./assets/icons/code.svg" width="40" alt="Code"/>&nbsp;
+  <img src="./assets/icons/commit.svg" width="40" alt="Commit"/>
+</p>
+
+![Static-only](./assets/badges/static-only.svg) ![Opt-in](./assets/badges/opt-in.svg) ![version](./assets/badges/version.svg)
 
 Turn source PDFs into **files that live next to the code**: per-section Markdown, the original
 figures as images, Mermaid renderings, and (optionally) structured register/pin/electrical data.
 The knowledge-base MCP endpoint answers questions *about* a document; this export puts the
 document itself in the working tree, where every coding assistant can read it.
 
+> [!NOTE]
+> **Validation status.** The exporter is ![Static-only](./assets/badges/static-only.svg) — it is validated by its offline test suite,
+> not by a live Azure run. The structured extractors are ![Opt-in](./assets/badges/opt-in.svg) (`corpus.exportExtractors`).
+
 > **Script:** [`scripts/export_repo_corpus.py`](../scripts/export_repo_corpus.py) ·
 > **Tests:** [`tests/test_export_repo_corpus.py`](../tests/test_export_repo_corpus.py) (offline)
+
+## At a glance
+
+| | What | Detail |
+|---|---|---|
+| <img src="./assets/icons/document-intelligence.svg" width="24" alt=""/> | **Analyze** | Document Intelligence prebuilt-layout, cached by file hash |
+| <img src="./assets/icons/azure-openai.svg" width="24" alt=""/> | **Describe figures** | Optional vision pass; AI-generated text is always labelled |
+| <img src="./assets/icons/folder.svg" width="24" alt=""/> | **Export** | Per-section Markdown, original figure crops, `manifest.json` — free to re-run |
+| <img src="./assets/icons/code.svg" width="24" alt=""/> | **Structured data** | Registers, pins and electrical tables as JSON + Markdown ![Opt-in](./assets/badges/opt-in.svg) |
+
+> [!TIP]
+> **Ship both** for large vendor manuals: find with the index, then open the exported section.
+> See the [comparison below](#index-export-or-both).
 
 ---
 
@@ -72,8 +103,9 @@ python export_repo_corpus.py --ids-file ../demo-ids.local.json --export --out ..
 | `--min-section-chars` | 1500 | Consecutive tiny sections are merged so the export isn't hundreds of stubs |
 | `--cache-dir` / `--out` | `out/export-cache` / `out/repo-export` | Both are under the gitignored `out/` folder |
 
-Limits worth knowing (Document Intelligence S0): up to 2,000 pages and 500 MB per document.
-The free F0 tier analyzes **only the first two pages**, which produces a misleadingly small export.
+> [!IMPORTANT]
+> Limits worth knowing (Document Intelligence S0): up to 2,000 pages and 500 MB per document.
+> The free F0 tier analyzes **only the first two pages**, which produces a misleadingly small export.
 
 ---
 
@@ -154,6 +186,7 @@ A register's name comes from the table caption, falling back to the nearest head
 Tables with overlapping bit ranges keep their field table but skip the diagram rather than
 drawing something wrong.
 
+> [!NOTE]
 > **Rendering note.** The bit-field diagram uses Mermaid's `packet-beta` keyword. It is
 > accepted by every Mermaid version that has packet diagrams (the documented name is `packet`
 > since v11). GitHub doesn't publish its Mermaid version, so each diagram is always followed by
@@ -169,13 +202,14 @@ drawing something wrong.
 
 ## Wire it into a repository
 
-| Step | Action |
-|---|---|
-| 1 | Copy `out/repo-export/<document>/` into the consuming repo (e.g. `docs/hardware/<document>/`). |
-| 2 | Merge `COPILOT-INSTRUCTIONS.snippet.md` into that repo's `.github/copilot-instructions.md`. |
-| 3 | Commit `manifest.json` alongside — it records which source revision the files came from. |
-| 4 | When the vendor revises the manual, re-run analyze + export and review the diff like code. |
+| Step | | Action | Gate |
+|---|---|---|---|
+| 1 | <img src="./assets/icons/folder.svg" width="24" alt=""/> | Copy `out/repo-export/<document>/` into the consuming repo (e.g. `docs/hardware/<document>/`). | ☐ folder present in the target repo |
+| 2 | <img src="./assets/icons/file.svg" width="24" alt=""/> | Merge `COPILOT-INSTRUCTIONS.snippet.md` into that repo's `.github/copilot-instructions.md`. | ☐ snippet merged |
+| 3 | <img src="./assets/icons/commit.svg" width="24" alt=""/> | Commit `manifest.json` alongside — it records which source revision the files came from. | ☐ manifest committed |
+| 4 | <img src="./assets/icons/code.svg" width="24" alt=""/> | When the vendor revises the manual, re-run analyze + export and review the diff like code. | ☐ diff reviewed |
 
+> [!WARNING]
 > **Licensing.** Exported sections reproduce the vendor's document. Check redistribution
 > rights before committing a third-party manual to a shared repository, as you would for the
 > PDF itself ([samples/README.md](../samples/README.md)).
@@ -195,4 +229,6 @@ drawing something wrong.
 
 ---
 
-*Last updated: 2026-09-30*
+Next: [11 - Customer walkthrough](./11-customer-walkthrough.md) →
+
+*Last updated: 2026-10-02*

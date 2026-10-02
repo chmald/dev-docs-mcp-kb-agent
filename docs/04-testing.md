@@ -1,8 +1,22 @@
+[README](../README.md) › [docs index](./00-reproduce-this-demo.md) › 04 Testing
+
 # 04 — Testing
 
-How to prove the build actually works — and, specifically, that **both ingestion tiers are
-earning their place**. Run these after [03-deployment.md](./03-deployment.md).
+<p>
+<img src="./assets/icons/ai-search.svg" width="40" alt="Azure AI Search"/>&nbsp;
+<img src="./assets/icons/document-intelligence.svg" width="40" alt="Document Intelligence"/>&nbsp;
+<img src="./assets/icons/foundry-models.svg" width="40" alt="Foundry Models"/>&nbsp;
+<img src="./assets/icons/blob-block.svg" width="40" alt="Blob storage"/>&nbsp;
+<img src="./assets/icons/powershell.svg" width="40" alt="Scripts"/>&nbsp;
+<img src="./assets/icons/code.svg" width="40" alt="Tests"/>
+</p>
 
+![version](./assets/badges/version.svg) ![Live-tested](./assets/badges/live-tested.svg) ![Static only](./assets/badges/static-only.svg) ![Search API 2026-05-01-preview](./assets/badges/search-api.svg)
+
+How to prove the build actually works — and, specifically, that **both ingestion tiers are
+earning their place**. Run these after [03-deployment.md](./03-deployment.md). This page is also the honest record of what has and has not been run against Azure: see [Live validation](#live-validation).
+
+> [!IMPORTANT]
 > **The trap this test plan exists to avoid.** The first build of this pattern passed a 4/4
 > golden set and was declared working. Auditing the *content* of the index afterwards found
 > 27% of tables split mid-table, 36% of figures discarded as empty tags, and 41% of heading
@@ -10,18 +24,34 @@ earning their place**. Run these after [03-deployment.md](./03-deployment.md).
 > back cannot detect a degraded passage.** Category C tests retrieval; category B tests what
 > is actually in the index. You need both.
 
+## At a glance
+
+| | Topic | One-line answer |
+|---|---|---|
+| <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | **What proves it works** | Chunk-quality audit (B) *and* golden set (C) — not retrieval alone |
+| <img src="./assets/icons/media-file.svg" width="24" alt=""/> | **Most valuable test** | The figure-only golden question — fails silently without the vision path |
+| <img src="./assets/icons/code.svg" width="24" alt=""/> | **Offline suite** | `python -m pytest tests -q` — 90 tests, none touch Azure |
+| <img src="./assets/icons/monitor.svg" width="24" alt=""/> | **Live evidence** | Two clean-room teardown/rebuilds in Aug 2026 ([docs/09](./09-findings-and-lessons.md)) |
+
+[![Testing matrix](./assets/testing-matrix.png)](./assets/testing-matrix.png)
+
+<sub>Editable source: [`assets/testing-matrix.drawio`](./assets/testing-matrix.drawio) - regenerate with `python scripts/export_diagrams.py docs/assets`.</sub>
+
 ---
 
 ## Test categories
 
-| # | Category | Answers | Automated |
-|---|---|---|---|
-| A | Functional | Did every resource deploy and connect? | partly (`azd provision --preview` for a dry run) |
-| B | **Chunk quality** | Is what landed in the index actually usable? | ✅ `compare_extraction_tiers.py --audit` |
-| C | Quality (golden set) | Does retrieval return the right source? | ✅ `compare_extraction_tiers.py --golden` |
-| D | **Tier provenance** | Are both tiers contributing? | ✅ facet query |
-| E | End-to-end demo script | Does the story land in front of a customer? | ✅ `demo_walkthrough.py` |
-| F | Regression checklist | Did a change break anything? | ✅ `pytest` |
+| | # | Category | Answers | Automated | Evidence |
+|---|---|---|---|---|---|
+| <img src="./assets/icons/resource-group.svg" width="20" alt=""/> | A | Functional | Did every resource deploy and connect? | partly (`azd provision --preview` for a dry run) | ![Live-tested](./assets/badges/live-tested.svg) |
+| <img src="./assets/icons/ai-search.svg" width="20" alt=""/> | B | **Chunk quality** | Is what landed in the index actually usable? | ✅ `compare_extraction_tiers.py --audit` | ![Live-tested](./assets/badges/live-tested.svg) |
+| <img src="./assets/icons/foundry-models.svg" width="20" alt=""/> | C | Quality (golden set) | Does retrieval return the right source? | ✅ `compare_extraction_tiers.py --golden` | ![Live-tested](./assets/badges/live-tested.svg) |
+| <img src="./assets/icons/blob-block.svg" width="20" alt=""/> | D | **Tier provenance** | Are both tiers contributing? | ✅ facet query | ![Live-tested](./assets/badges/live-tested.svg) |
+| <img src="./assets/icons/powershell.svg" width="20" alt=""/> | E | End-to-end demo script | Does the story land in front of a customer? | ✅ `demo_walkthrough.py` | ![Static only](./assets/badges/static-only.svg) |
+| <img src="./assets/icons/code.svg" width="20" alt=""/> | F | Regression checklist | Did a change break anything? | ✅ `pytest` | ![Static only](./assets/badges/static-only.svg) |
+
+> [!NOTE]
+> The badges describe how each *layer's tooling* has been validated, not how often you should run it: categories A-D were exercised against Azure in the Aug 2026 rebuilds, while the walkthrough script (E) and the offline regression suite (F) have only been run offline. See [Live validation](#live-validation).
 
 ---
 
@@ -55,9 +85,10 @@ distribution. Reference numbers from the validated build:
 | Citation validity | page range — structurally cannot misattribute | deepest heading only, never a path | A confidently wrong citation is worse than a coarse one |
 | Chunk size | 204–2,317 chars | tuned by `chunkSizeTokens` | Sub-300-char chunks are retrieval noise; 6,000+ char chunks bury the answer |
 
-**Fail conditions:** any chunk under ~100 characters in bulk, empty `<figure></figure>` tags
-in Tier DI+ output (means the vision skill did not run), or `sectionLabel`/`pageNumber*` empty
-across the board.
+> [!WARNING]
+> **Fail conditions:** any chunk under ~100 characters in bulk, empty `<figure></figure>` tags
+> in Tier DI+ output (means the vision skill did not run), or `sectionLabel`/`pageNumber*` empty
+> across the board.
 
 ---
 
@@ -79,8 +110,9 @@ Include at least one question of each kind:
 | Deep-section | something under a 4th- or 5th-level heading | Citation granularity |
 | Out-of-corpus | something the corpus genuinely does not cover | Honest "no relevant content" rather than a hallucination |
 
-**The figure-only question is the most valuable test in this document.** It is the one that
-distinguishes a working hybrid from a pipeline that quietly discarded every diagram.
+> [!TIP]
+> **The figure-only question is the most valuable test in this document.** It is the one that
+> distinguishes a working hybrid from a pipeline that quietly discarded every diagram.
 
 ---
 
@@ -186,4 +218,25 @@ methodology guards, and model-configuration guards.
 
 ---
 
-*Last updated: 2026-09-30*
+## Live validation
+
+What has actually been run, and where. Nothing on this page claims more than the record in [09 — Findings and lessons](./09-findings-and-lessons.md).
+
+| Capability | Offline (90 tests) | Live (against Azure) | Evidence |
+|---|---|---|---|
+| Hybrid ingestion (both tiers) | ✅ API-contract and model-configuration guards | ✅ Two clean-room teardown/rebuilds, Aug 2026 | ![Live-tested](./assets/badges/live-tested.svg) |
+| Unified index (`idx-documents-hybrid`) | ✅ API-contract guards | ✅ Same rebuilds | ![Live-tested](./assets/badges/live-tested.svg) |
+| Knowledge base retrieval | ✅ API-contract guards | ✅ Same rebuilds | ![Live-tested](./assets/badges/live-tested.svg) |
+| Native MCP endpoint | — | ✅ Same rebuilds | ![Live-tested](./assets/badges/live-tested.svg) |
+| `azd up` (v1.2.0) | ✅ Templates compile, hooks parse, guards exercised locally | ⏳ Not yet run end to end against a subscription | ![Static only](./assets/badges/static-only.svg) |
+| Repository export (`export_repo_corpus.py`, v1.1.0) | ✅ `test_export_repo_corpus.py` | ⏳ Not run against Azure | ![Static only](./assets/badges/static-only.svg) |
+| Scripted walkthrough (`demo_walkthrough.py`) | ✅ `test_demo_walkthrough.py` | ⏳ Not run against Azure | ![Static only](./assets/badges/static-only.svg) |
+
+> [!CAUTION]
+> Don't present `azd up`, the repository export or the scripted walkthrough as live-tested. They were validated offline only. Run them against your own subscription — and record the result — before quoting them to a customer.
+
+---
+
+Next: [05 - Troubleshooting](./05-troubleshooting.md) →
+
+*Last updated: 2026-10-02*

@@ -1,23 +1,51 @@
+[README](../README.md) › [docs index](./00-reproduce-this-demo.md) › 03b Manual deployment
+
 # 03b — Manual Deployment (No Bicep / IaC)
+
+<p>
+<img src="./assets/icons/resource-group.svg" width="40" alt="Resource group"/>&nbsp;
+<img src="./assets/icons/storage.svg" width="40" alt="Storage account"/>&nbsp;
+<img src="./assets/icons/foundry.svg" width="40" alt="Microsoft Foundry"/>&nbsp;
+<img src="./assets/icons/ai-search.svg" width="40" alt="Azure AI Search"/>&nbsp;
+<img src="./assets/icons/key-vault.svg" width="40" alt="Key Vault"/>&nbsp;
+<img src="./assets/icons/container-apps.svg" width="40" alt="Container Apps"/>
+</p>
+
+![version](./assets/badges/version.svg) ![Manual path](./assets/badges/manual-path.svg) ![DIY](./assets/badges/diy.svg) ![Optional](./assets/badges/optional.svg)
 
 A complete alternative to [03-deployment.md](./03-deployment.md) for customers who can't or don't want to run Bicep/IaC. Every resource below is created with imperative `az` CLI commands (with the Azure Portal equivalent noted per step) and produces the **same** resource shapes, names, and RBAC assignments as `infra/main.bicep` — so Phases 2, 3, and 5 (which are already infrastructure-agnostic; they call the same Python scripts against whatever Search/Foundry resources exist) are **not duplicated here** — this doc only replaces Phase 1 (foundation resources) and Phase 4 (optional custom wrapper server) with a Bicep-free equivalent.
 
+## At a glance
+
+| | Topic | One-line answer |
+|---|---|---|
+| <img src="./assets/icons/azure-devops.svg" width="24" alt=""/> | **Use when** | Bicep/ARM deployments are blocked, no Bicep CLI is available, or you want each resource created visibly (workshop) |
+| <img src="./assets/icons/resource-group.svg" width="24" alt=""/> | **Replaces** | Phase 1 (foundation resources) and Phase 4 (optional wrapper server) only |
+| <img src="./assets/icons/code.svg" width="24" alt=""/> | **Unchanged** | Phases 2, 3 and 5 call the same Python scripts — follow [03-deployment.md](./03-deployment.md) |
+| <img src="./assets/icons/cost-management.svg" width="24" alt=""/> | **Trade-off** | About 3.5-4.5 hours hands-on — roughly 30-45 minutes longer than the Bicep path |
+
+> [!NOTE]
 > **When to use this instead of `03-deployment.md`:** the customer's environment doesn't allow Bicep/ARM template deployments, the operator doesn't have Bicep CLI tooling available, or you want to demonstrate each resource being created individually (useful for a workshop/teaching context). Otherwise, `03-deployment.md`'s Bicep path is faster and less error-prone — use this doc as the exception, not the default.
 
+> [!TIP]
 > **If IaC *is* allowed,** `azd up` is the fastest path: one command, same resources and names. See [03 § Fast path — azd up](./03-deployment.md#fast-path--azd-up).
+
+[![Manual deployment steps](./assets/manual-deployment-steps.png)](./assets/manual-deployment-steps.png)
+
+<sub>Editable source: [`assets/manual-deployment-steps.drawio`](./assets/manual-deployment-steps.drawio) - regenerate with `python scripts/export_diagrams.py docs/assets`.</sub>
 
 ---
 
 ## Phase overview (manual path)
 
-| Phase | What you build | ~Time | Validation at end |
-|---|---|---|---|
-| 0 | Authenticate to the intended tenant + subscription | 2 min | `az account show` matches target |
-| 1 (manual) | Foundation resources (RG, Storage, Key Vault, Foundry, Search) via imperative `az` commands | 45-60 min | All 5 resources exist; RBAC assigned |
-| 2 | Same as [03-deployment.md § Phase 2](./03-deployment.md#phase-2--hybrid-ingestion) — unchanged | 30 min | Indexer run shows 0 failed docs |
-| 3 | Same as [03-deployment.md § Phase 3](./03-deployment.md#phase-3--knowledge-base--mcp-endpoint) — unchanged | 30-60 min | Retrieve call returns grounded, cited results |
-| 4 (manual) | Optional custom wrapper server via imperative `az` commands (skip if the native endpoint check in Phase 3 succeeded and you don't want the wrapper) | 45-60 min | Container App responds to an MCP `tools/list` call |
-| 5 | Same as [03-deployment.md § Phase 5](./03-deployment.md#phase-5--wire-github-copilot--vs-code) — unchanged | 15 min | Copilot Chat answers a corpus question with a citation |
+| | Phase | What you build | ~Time | Validation at end |
+|---|---|---|---|---|
+| <img src="./assets/icons/entra-id.svg" width="20" alt=""/> | 0 | Authenticate to the intended tenant + subscription | 2 min | `az account show` matches target |
+| <img src="./assets/icons/resource-group.svg" width="20" alt=""/> | 1 (manual) | Foundation resources (RG, Storage, Key Vault, Foundry, Search) via imperative `az` commands | 45-60 min | All 5 resources exist; RBAC assigned |
+| <img src="./assets/icons/blob-block.svg" width="20" alt=""/> | 2 | Same as [03-deployment.md § Phase 2](./03-deployment.md#phase-2--hybrid-ingestion) — unchanged | 30 min | Indexer run shows 0 failed docs |
+| <img src="./assets/icons/ai-search.svg" width="20" alt=""/> | 3 | Same as [03-deployment.md § Phase 3](./03-deployment.md#phase-3--knowledge-base--mcp-endpoint) — unchanged | 30-60 min | Retrieve call returns grounded, cited results |
+| <img src="./assets/icons/container-apps.svg" width="20" alt=""/> | 4 (manual) | Optional custom wrapper server via imperative `az` commands (skip if the native endpoint check in Phase 3 succeeded and you don't want the wrapper) | 45-60 min | Container App responds to an MCP `tools/list` call |
+| <img src="./assets/icons/code.svg" width="20" alt=""/> | 5 | Same as [03-deployment.md § Phase 5](./03-deployment.md#phase-5--wire-github-copilot--vs-code) — unchanged | 15 min | Copilot Chat answers a corpus question with a citation |
 
 **Total manual build: ~3.5-4.5 hours of hands-on time** — roughly 30-45 minutes longer than the Bicep path (Phase 1 has more individual steps, and there's no single `deploy.ps1` writing `demo-ids.local.json` for you — you populate it by hand as you go, per the sub-steps below).
 
@@ -25,14 +53,31 @@ A complete alternative to [03-deployment.md](./03-deployment.md) for customers w
 
 ## Phase 0 — Authenticate to the right tenant
 
+> [!WARNING]
+> Set the tenant and subscription explicitly before creating anything — `az` and `azd` keep separate logins, and ambient state can point at a different tenant. Verify with `az account show` before the first resource is created.
+
 Identical to the Bicep path — see [03-deployment.md § Phase 0](./03-deployment.md#phase-0--authenticate-to-the-right-tenant). Do this first regardless of which deployment path you use.
 
 ---
 
 ## Phase 1 (manual) — Foundation resources
 
+Portal step cards — one per resource, in dependency order (each links to the CLI + portal detail below):
+
+| Step | | Resource — portal path | Gate |
+|---|---|---|---|
+| **1.0** | <img src="./assets/icons/resource-group.svg" width="28" alt=""/> | Resource groups → + Create → region | ☐ Resource group exists |
+| **1.1** | <img src="./assets/icons/storage.svg" width="28" alt=""/> | Storage accounts → + Create → then Containers → + Container `raw` ([§ 1.1](#11-storage-account--raw-container)) | ☐ `raw` container, public access Private |
+| **1.2** | <img src="./assets/icons/foundry.svg" width="28" alt=""/> | Foundry / AI services multi-service account → **create a project** → Deployments → + Deploy model ×4 ([§ 1.2](#12-foundry-multi-service-account-document-intelligence--azure-openai)) | ☐ Project exists, 4 model deployments |
+| **1.3** | <img src="./assets/icons/ai-search.svg" width="28" alt=""/> | Azure AI Search → + Create (Basic) → Settings → Semantic ranker → Enable ([§ 1.3](#13-azure-ai-search)) | ☐ Semantic ranker enabled |
+| **1.4** | <img src="./assets/icons/key-vault.svg" width="28" alt=""/> | Key Vaults → + Create (RBAC permission model, soft-delete 7 days) ([§ 1.4](#14-key-vault)) | ☐ Vault `Succeeded` |
+| **1.5** | <img src="./assets/icons/keys.svg" width="28" alt=""/> | Store the Search admin key as secret `search-admin-key` ([§ 1.5](#15-store-the-search-admin-key-in-key-vault)) | ☐ Secret present (or documented policy fallback) |
+| **1.6** | <img src="./assets/icons/managed-identity.svg" width="28" alt=""/> | Access control (IAM) → + Add role assignment ×4 ([§ 1.6](#16-rbac-role-assignments)) | ☐ 4 role assignments listed |
+| **1.7** | <img src="./assets/icons/file.svg" width="28" alt=""/> | Copy `demo-ids.template.json` → `demo-ids.local.json` and fill it in ([§ 1.7](#17-populate-demo-idslocaljson)) | ☐ All listed fields populated |
+
 Set shared variables first (PowerShell):
 
+> [!NOTE]
 > **Shell note.** Only variable *assignment* differs between shells — `$Rg`, `$Storage` and
 > friends are *referenced* identically in PowerShell and bash, so every command after this
 > block is the same on all platforms. Set the variables using whichever form matches your shell.
@@ -106,6 +151,7 @@ az cognitiveservices account deployment create --name $Foundry --resource-group 
 
 **Portal equivalent:** Azure AI Foundry portal (or Azure Portal → Azure AI services → + Create → "Azure AI services multi-service account") → kind `AIServices`, S0 pricing tier → create a **project** in the Foundry portal → then Deployments → + Deploy model, once each for `text-embedding-3-large`, `gpt-5-mini`, `gpt-5.6-sol`, and `gpt-5.5`.
 
+> [!IMPORTANT]
 > **A brand-new deployment is not immediately resolvable.** Content Understanding can return `DeploymentIdNotFound` for a deployment the control plane already reports `Succeeded` — wait a few minutes and re-run.
 
 > **Both Document Intelligence and Azure OpenAI are served from this single resource** — no separate Document Intelligence account needed (see [01-architecture.md](./01-architecture.md)).
@@ -197,7 +243,7 @@ Copy `demo-ids.template.json` to `demo-ids.local.json` (gitignored) and fill in 
 
 ### Phase 1 (manual) validation
 
-- [ ] Storage account, Foundry account (with 2 model deployments), Search service, and Key Vault all show `Succeeded`/exist in the portal
+- [ ] Storage account, Foundry account (with 4 model deployments: `embedding`, `chat`, `vision`, `sol`), Search service, and Key Vault all show `Succeeded`/exist in the portal
 - [ ] `demo-ids.local.json` populated with the fields listed in § 1.7
 - [ ] All 4 role assignments in § 1.6 present (`az role assignment list --resource-group $Rg -o table`)
 - [ ] Search admin key stored as a Key Vault secret named `search-admin-key`
@@ -208,15 +254,33 @@ Copy `demo-ids.template.json` to `demo-ids.local.json` (gitignored) and fill in 
 
 **No changes from the Bicep path.** `scripts/upload_documents.py` and `scripts/post_deploy_search.py` call the AI Search / Blob Storage REST APIs directly — they don't care whether the underlying resources were created by Bicep or by hand. Follow [03-deployment.md § Phase 2](./03-deployment.md#phase-2--hybrid-ingestion) exactly as written.
 
+| Script | Talks to | Cares how the resource was created? |
+|---|---|---|
+| `scripts/upload_documents.py` | Blob Storage REST API | No |
+| `scripts/post_deploy_search.py` | AI Search REST API | No |
+
 ## Phase 3 — Knowledge Base + MCP endpoint
 
 **No changes from the Bicep path.** Follow [03-deployment.md § Phase 3](./03-deployment.md#phase-3--knowledge-base--mcp-endpoint) exactly as written. If the native MCP check succeeds, skip to Phase 5 — you don't need Phase 4 at all.
+
+> [!TIP]
+> The native endpoint is the default. The Phase 3 check result decides whether Phase 4 is needed — `wrapper-required` means build it, `native` means skip to Phase 5.
 
 ---
 
 ## Phase 4 (manual) — Optional custom wrapper server (skip if not needed)
 
-Only do this if Phase 3's native MCP check returned `wrapper-required`, or you specifically want the wrapper's defense-in-depth features (see [docs/06 § 4](./06-mcp-endpoint-and-fallback-server.md#4--the-optional-custom-wrapper-server)).
+> [!CAUTION]
+> Don't build this by default. Only do this if Phase 3's native MCP check returned `wrapper-required`, or you specifically want the wrapper's defense-in-depth features (see [docs/06 § 4](./06-mcp-endpoint-and-fallback-server.md#4--the-optional-custom-wrapper-server)).
+
+Resources created in this phase:
+
+| Resource | Icon | Name variable | Portal path |
+|---|---|---|---|
+| Container Registry | <img src="./assets/icons/container-registry.svg" width="20" alt=""/> | `$Registry` | Container Registry → + Create (Basic, Admin user disabled) |
+| Log Analytics workspace | <img src="./assets/icons/log-analytics.svg" width="20" alt=""/> | `$CaeEnv-logs` | Created alongside the Container Apps environment |
+| Container Apps environment | <img src="./assets/icons/container-apps.svg" width="20" alt=""/> | `$CaeEnv` | Container Apps → + Create Container App Environment |
+| Container App | <img src="./assets/icons/container-apps.svg" width="20" alt=""/> | `$CaName` | + Create Container App (ACR image, system-assigned identity, ingress on 8080) |
 
 ```powershell
 # PowerShell
@@ -233,6 +297,8 @@ CaName="ca-mcp-$Workload-$Env-$Region"
 ```
 
 Then, on any platform:
+
+<details><summary><b>Show the full Phase 4 command block</b></summary>
 
 ```bash
 
@@ -263,6 +329,8 @@ az containerapp secret set --name $CaName --resource-group $Rg --secrets "search
 az containerapp update --name $CaName --resource-group $Rg --set-env-vars "SEARCH_API_KEY=secretref:search-key"
 ```
 
+</details>
+
 **Portal equivalent:** Container Registry → + Create (Basic SKU, Admin user disabled) → Container Apps → + Create Container App Environment → + Create Container App (pointing at the ACR image, system-assigned identity, ingress enabled on port 8080) → the app's **Secrets** blade → + Add → Key Vault reference → the app's **Identity** blade confirms system-assigned is on → grant the two role assignments above via each target resource's Access control (IAM) blade.
 
 ### Phase 4 (manual) validation
@@ -276,7 +344,11 @@ az containerapp update --name $CaName --resource-group $Rg --set-env-vars "SEARC
 
 ## Phase 5 — Wire GitHub Copilot / VS Code
 
-**No changes from the Bicep path.** Follow [03-deployment.md § Phase 5](./03-deployment.md#phase-5--wire-github-copilot--vs-code) exactly as written.
+**No changes from the Bicep path.** Follow [03-deployment.md § Phase 5](./03-deployment.md#phase-5--wire-github-copilot--vs-code) exactly as written; client setup detail is in [07 — GitHub Copilot MCP client setup](./07-github-copilot-mcp-client-setup.md).
+
+| | Gate |
+|---|---|
+| <img src="./assets/icons/code.svg" width="20" alt=""/> | ☐ Copilot Chat answers a corpus question with a citation |
 
 ---
 
@@ -284,6 +356,13 @@ az containerapp update --name $CaName --resource-group $Rg --set-env-vars "SEARC
 
 Same as [03-deployment.md § Post-deployment checklist](./03-deployment.md#post-deployment-checklist) — the manual path produces an equivalent, fully-functional deployment; nothing downstream needs to know whether Phase 1/4 used Bicep or imperative CLI commands.
 
+| | Check | Where defined |
+|---|---|---|
+| <img src="./assets/icons/resource-group.svg" width="20" alt=""/> | Phase 1 validation boxes all ticked | [Phase 1 validation](#phase-1-manual-validation) |
+| <img src="./assets/icons/container-apps.svg" width="20" alt=""/> | Phase 4 validation boxes ticked (only if you built the wrapper) | [Phase 4 validation](#phase-4-manual-validation) |
+
 ---
 
-*Last updated: 2026-08-24*
+Next: [04 - Testing](./04-testing.md) →
+
+*Last updated: 2026-10-02*

@@ -1,4 +1,18 @@
+[README](../README.md) › [docs index](./00-reproduce-this-demo.md) › 01 Architecture
+
 # 01 — Architecture
+
+<p>
+<img src="./assets/icons/document-intelligence.svg" width="40" alt="Document Intelligence"/>&nbsp;
+<img src="./assets/icons/foundry.svg" width="40" alt="Content Understanding (Foundry)"/>&nbsp;
+<img src="./assets/icons/ai-search.svg" width="40" alt="Azure AI Search"/>&nbsp;
+<img src="./assets/icons/azure-openai.svg" width="40" alt="Azure OpenAI"/>&nbsp;
+<img src="./assets/icons/blob-block.svg" width="40" alt="Blob Storage"/>&nbsp;
+<img src="./assets/icons/key-vault.svg" width="40" alt="Key Vault"/>&nbsp;
+<img src="./assets/icons/code.svg" width="40" alt="VS Code and GitHub Copilot"/>
+</p>
+
+![Version](./assets/badges/version.svg) ![GA](./assets/badges/ga.svg) ![Public preview](./assets/badges/public-preview.svg) ![Live-tested](./assets/badges/live-tested.svg) ![Static-only](./assets/badges/static-only.svg)
 
 Reference architecture for the Developer Docs MCP Knowledge Base pattern. Read this first,
 then [02-prerequisites.md](./02-prerequisites.md).
@@ -8,26 +22,36 @@ then [02-prerequisites.md](./02-prerequisites.md).
 justification for the hybrid ingestion design below, including the cost model and the
 customer-facing "why both services" narrative.
 
+## At a glance
+
+| | Question | Answer |
+|---|---|---|
+| <img src="./assets/icons/file.svg" width="24" alt=""/> | **Routing rule** | Page count, read locally — Content Understanding for ≤300 pages, Document Intelligence Layout above |
+| <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | **One index** | Both tiers project into a single AI Search index and one knowledge base |
+| <img src="./assets/icons/foundry.svg" width="24" alt=""/> | **Figures** | One `ChatCompletionSkill` verbalizes figures on both tiers ![GA](./assets/badges/ga.svg) |
+| <img src="./assets/icons/code.svg" width="24" alt=""/> | **Client surface** | Native Knowledge Base MCP endpoint ![Public preview](./assets/badges/public-preview.svg) |
+
+> [!NOTE]
+> The router, hybrid ingestion, the unified index and the native MCP endpoint were live-tested in two clean-room rebuilds (Aug 2026) ![Live-tested](./assets/badges/live-tested.svg). `azd up`, repo export and the walkthrough script are static-only ![Static-only](./assets/badges/static-only.svg).
+
 ---
 
 ## Goals
 
-- Ground a coding assistant's answers in an authoritative technical document corpus, with
-  document- and section-level citations
-- Expose that grounded retrieval as a standard **MCP tool** so any MCP-compatible client can
-  consume it — starting with GitHub Copilot in VS Code
-- Keep the platform low-code: no custom chat UI, no agent-orchestration runtime to author
-- **Handle a real technical corpus** — including 500–1,500 page reference manuals and the
-  register/pin diagrams that carry the engineering content
+| | Goal |
+|---|---|
+| <img src="./assets/icons/file.svg" width="24" alt=""/> | Ground a coding assistant's answers in an authoritative technical document corpus, with document- and section-level citations |
+| <img src="./assets/icons/code.svg" width="24" alt=""/> | Expose that grounded retrieval as a standard **MCP tool** so any MCP-compatible client can consume it — starting with GitHub Copilot in VS Code |
+| <img src="./assets/icons/gear.svg" width="24" alt=""/> | Keep the platform low-code: no custom chat UI, no agent-orchestration runtime to author |
+| <img src="./assets/icons/document-intelligence.svg" width="24" alt=""/> | **Handle a real technical corpus** — including 500–1,500 page reference manuals and the register/pin diagrams that carry the engineering content |
 
 ## Non-goals
 
-- Not a general-purpose chatbot for business users (Teams / M365 Copilot) — see
-  [`rag-knowledge-base-pattern`](../../rag-knowledge-base-pattern/README.md) for that surface
-- Not a write-back or code-modification tool — retrieval only; the MCP tool returns grounded
-  text, it does not edit files or call other systems
-- Not scoped to a specific hardware vendor or document family — any PDF corpus fits the same
-  pipeline
+| | Not in scope |
+|---|---|
+| ❌ | Not a general-purpose chatbot for business users (Teams / M365 Copilot) — see [`rag-knowledge-base-pattern`](../../rag-knowledge-base-pattern/README.md) for that surface |
+| ❌ | Not a write-back or code-modification tool — retrieval only; the MCP tool returns grounded text, it does not edit files or call other systems |
+| ❌ | Not scoped to a specific hardware vendor or document family — any PDF corpus fits the same pipeline |
 
 ---
 
@@ -59,16 +83,20 @@ Full measurements, the DI-only vs CU-only vs hybrid comparison, and cost:
 
 <sub>Editable source: [`assets/dev-docs-mcp-knowledge-agent-architecture.drawio`](./assets/dev-docs-mcp-knowledge-agent-architecture.drawio) — open in VS Code (draw.io extension) or app.diagrams.net; regenerate the PNG with `python scripts/export_diagrams.py docs/assets`.</sub>
 
-The pills on each component follow the legend at the bottom of the diagram. The two **PREVIEW** pills, Tier CU (semantic chunking) and the knowledge base plus its native MCP endpoint, are the components listed in [docs/08 › Verify before you quote](./08-extraction-tier-comparison.md#verify-before-you-quote). A customer that cannot accept preview components runs the GA Tier DI+ path for the whole corpus.
-| Tier | Components | Role |
-|---|---|---|
-| 1 · Source | Technical PDFs; optional page-ranged split parts | Bring-your-own corpus; `--split` keeps original page numbers in part names |
-| 2 · Route & stage | `hybrid_ingest.py` router, Blob Storage (`raw/cu/`, `raw/di/`) | Page count decides the tier before any spend; blob prefix scopes each tier's data source |
-| 3 · Extraction & models | Content Understanding (Tier CU), Document Intelligence Layout (Tier DI+), model deployments in one Foundry account | Extraction + chunking; vision model verbalizes figures on both tiers; embedding + frontier models |
-| 4 · Retrieval | Unified AI Search index, knowledge base (`extractiveData`) | One corpus regardless of tier; agentic retrieval with query planning |
-| 5 · MCP surface | Native Knowledge Base MCP endpoint; optional wrapper on Container Apps; Key Vault | Zero-code MCP exposure; wrapper only for defense-in-depth |
-| 6 · Developer | VS Code + GitHub Copilot (agent mode); `demo_walkthrough.py` | Consumption; scripted demo verification |
-| Optional lane | `export_repo_corpus.py` → repository package → customer repo | The same documents committed next to the code ([10](./10-repo-corpus-export.md)) |
+> [!WARNING]
+> The pills on each component follow the legend at the bottom of the diagram. The two **PREVIEW** pills, Tier CU (semantic chunking) and the knowledge base plus its native MCP endpoint, are the components listed in [docs/08 › Verify before you quote](./08-extraction-tier-comparison.md#verify-before-you-quote). A customer that cannot accept preview components runs the GA Tier DI+ path for the whole corpus.
+
+### Tier → component → role
+
+| Tier | | Components | Role |
+|---|---|---|---|
+| 1 · Source | <img src="./assets/icons/file.svg" width="24" alt=""/> | Technical PDFs; optional page-ranged split parts | Bring-your-own corpus; `--split` keeps original page numbers in part names |
+| 2 · Route & stage | <img src="./assets/icons/blob-block.svg" width="24" alt=""/> | `hybrid_ingest.py` router, Blob Storage (`raw/cu/`, `raw/di/`) ![GA](./assets/badges/ga.svg) | Page count decides the tier before any spend; blob prefix scopes each tier's data source |
+| 3 · Extraction & models | <img src="./assets/icons/document-intelligence.svg" width="24" alt=""/> | Content Understanding (Tier CU) ![Public preview](./assets/badges/public-preview.svg), Document Intelligence Layout (Tier DI+) ![GA](./assets/badges/ga.svg), model deployments in one Foundry account | Extraction + chunking; vision model verbalizes figures on both tiers; embedding + frontier models |
+| 4 · Retrieval | <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | Unified AI Search index ![GA](./assets/badges/ga.svg), knowledge base (`extractiveData`) ![Public preview](./assets/badges/public-preview.svg) | One corpus regardless of tier; agentic retrieval with query planning |
+| 5 · MCP surface | <img src="./assets/icons/container-apps.svg" width="24" alt=""/> | Native Knowledge Base MCP endpoint ![Public preview](./assets/badges/public-preview.svg); optional wrapper on Container Apps ![Optional](./assets/badges/optional.svg); Key Vault | Zero-code MCP exposure; wrapper only for defense-in-depth |
+| 6 · Developer | <img src="./assets/icons/code.svg" width="24" alt=""/> | VS Code + GitHub Copilot (agent mode); `demo_walkthrough.py` | Consumption; scripted demo verification |
+| Optional lane | <img src="./assets/icons/folder.svg" width="24" alt=""/> | `export_repo_corpus.py` → repository package → customer repo ![Opt-in](./assets/badges/opt-in.svg) | The same documents committed next to the code ([10](./10-repo-corpus-export.md)) |
 
 ---
 
@@ -105,6 +133,7 @@ skill below.
 
 Citations: **deepest heading** (`sectionLabel`).
 
+> [!NOTE]
 > **Why the deepest heading and never a heading path:** the Document Layout skill's `sections`
 > dictionary holds the most recently seen heading at each level, not a validated ancestor
 > chain, so rendering `h1 > h2 > h3` asserts a parent relationship that is wrong ~21.7% of the
@@ -160,15 +189,22 @@ answer "is this tier actually pulling its weight?" after the fact.
 
 ## Retrieval and the MCP surface
 
+| Component | | Role | Status |
+|---|---|---|---|
+| Knowledge Base (agentic retrieval) | <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | Multi-query planning over the unified index; `outputMode: extractiveData` | ![Public preview](./assets/badges/public-preview.svg) |
+| Native MCP endpoint | <img src="./assets/icons/code.svg" width="24" alt=""/> | Zero-code MCP tool exposed by the knowledge base | ![Default](./assets/badges/default.svg) ![Public preview](./assets/badges/public-preview.svg) |
+| Wrapper MCP server | <img src="./assets/icons/container-apps.svg" width="24" alt=""/> | Defense-in-depth on Container Apps | ![Optional](./assets/badges/optional.svg) |
+
 An AI Search **Knowledge Base** performs agentic retrieval (multi-query planning) over the
 unified index, exposed through its **native MCP endpoint** — zero custom code.
 
-**`outputMode` must be `extractiveData`.** The native MCP tool accepts only a `queries` array;
-it cannot request reference source data. Under `answerSynthesis` the synthesising model
-receives references with no source data and replies *"I cannot access external documents"*,
-while direct REST retrieval works fine — a silent and very confusing failure. `extractiveData`
-returns the ranked passages themselves, which is what an MCP client wants anyway: GitHub
-Copilot does its own synthesis and citation.
+> [!IMPORTANT]
+> **`outputMode` must be `extractiveData`.** The native MCP tool accepts only a `queries` array;
+> it cannot request reference source data. Under `answerSynthesis` the synthesising model
+> receives references with no source data and replies *"I cannot access external documents"*,
+> while direct REST retrieval works fine — a silent and very confusing failure. `extractiveData`
+> returns the ranked passages themselves, which is what an MCP client wants anyway: GitHub
+> Copilot does its own synthesis and citation.
 
 An optional custom MCP server wrapper exists for defense-in-depth (token lifecycle, custom
 pre/post-processing, IP allowlisting) — see
@@ -184,8 +220,8 @@ questions:
 
 | Call site | Model | Constraint |
 |---|---|---|
-| Figure verbalization, **both tiers** (`ChatCompletionSkill`) | `gpt-5.6-sol` | No allowlist — use current frontier |
-| Knowledge Base query planning | `gpt-5.6-sol` | Runs on every MCP call |
+| Figure verbalization, **both tiers** (`ChatCompletionSkill`) | `gpt-4.1` (`vision`) | Non-reasoning on purpose: 30 s per-call timeout with a total-failure mode |
+| Knowledge Base query planning | `gpt-5.6-sol` (`sol`) | Runs on every MCP call; no timeout pressure, so use the frontier model |
 | Embeddings (both tiers) | `text-embedding-3-large` (3072 dims) | Must match the index vector width |
 
 Only **one** frontier deployment is needed. Content Understanding's own figure-description
@@ -230,5 +266,7 @@ domain-specific fields only when you need to *filter* on them.
 the cost. Run `--plan` against a real corpus before quoting anything.
 
 ---
+
+Next: [02 - Prerequisites](./02-prerequisites.md) →
 
 *Last updated: 2026-10-02*

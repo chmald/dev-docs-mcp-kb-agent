@@ -1,5 +1,21 @@
+[README](../README.md) › [docs index](./00-reproduce-this-demo.md) › 08 Extraction tier comparison
+
 # 08 — Extraction tier: Document Intelligence Layout vs. Content Understanding
 
+<p>
+  <img src="./assets/icons/document-intelligence.svg" width="40" alt="Document Intelligence"/>&nbsp;
+  <img src="./assets/icons/foundry.svg" width="40" alt="Foundry (Content Understanding)"/>&nbsp;
+  <img src="./assets/icons/azure-openai.svg" width="40" alt="Azure OpenAI vision deployment"/>&nbsp;
+  <img src="./assets/icons/ai-search.svg" width="40" alt="Azure AI Search"/>&nbsp;
+  <img src="./assets/icons/storage.svg" width="40" alt="Blob Storage"/>&nbsp;
+  <img src="./assets/icons/cost-management.svg" width="40" alt="Cost model"/>
+</p>
+
+![GA](./assets/badges/ga.svg) ![Public preview](./assets/badges/public-preview.svg) ![Live-tested](./assets/badges/live-tested.svg) ![Default](./assets/badges/default.svg) ![version](./assets/badges/version.svg)
+
+This is the decision guide for *which extraction tier this pattern should use*: Document Intelligence Layout, Content Understanding, or both behind one router. It is for the architect or SE who has to defend the choice to a customer, and it answers three questions: which tier gives better chunks, what each costs, and which parts are still preview. It is backed by a comparison you can re-run against your own corpus with [`scripts/compare_extraction_tiers.py`](../scripts/compare_extraction_tiers.py) — the numbers below came from that harness, not from a slide.
+
+> [!TIP]
 > **Short answer for a technical-manual corpus:** don't pick one — **route per document**.
 > Content Understanding is measurably better *and* cheaper on everything that matters for
 > datasheets, but it rejects any file over **300 pages**, and reference manuals routinely
@@ -7,19 +23,38 @@
 > Document Layout **plus a vision skill that fills in its figure blindness**, and land both in
 > one index behind one MCP endpoint. See [Don't choose — route](#dont-choose--route-the-hybrid-tier).
 
-This is the decision guide for *which extraction tier this pattern should use*. It is backed
-by a comparison you can re-run against your own corpus with
-[`scripts/compare_extraction_tiers.py`](../scripts/compare_extraction_tiers.py) — the numbers
-below came from that harness, not from a slide.
+> [!NOTE]
+> **Scope.** This compares **RAG chunk quality**. For the *field extraction* comparison
+> (per-field confidence, template drift, tiered DI→CU→OCR routing, migration effort), see the
+> sibling `document-intelligence-vs-content-understanding` demo — a different axis of the same
+> DI-vs-CU question, and complementary to this one.
 
-**Scope note.** This compares **RAG chunk quality**. For the *field extraction* comparison
-(per-field confidence, template drift, tiered DI→CU→OCR routing, migration effort), see the
-sibling `document-intelligence-vs-content-understanding` demo — a different axis of the same
-DI-vs-CU question, and complementary to this one.
+## At a glance
+
+| | Topic | One-line answer |
+|---|---|---|
+| <img src="./assets/icons/foundry.svg" width="24" alt=""/> | **Tier CU** (Content Understanding, ≤300 pages) | Better on every quality axis measured, at about half the list price — but **hard-rejects files over 300 pages**. Semantic chunking is ![Public preview](./assets/badges/public-preview.svg). |
+| <img src="./assets/icons/document-intelligence.svg" width="24" alt=""/> | **Tier DI+** (Document Layout + vision skill) | No page ceiling; the vision skill verbalizes the figures Layout discards. Both skills are ![GA](./assets/badges/ga.svg). |
+| <img src="./assets/icons/azure-openai.svg" width="24" alt=""/> | **Vision model** | `gpt-4.1` (non-reasoning) for figures on both tiers; the 30 s per-call timeout rewards predictability. |
+| <img src="./assets/icons/cost-management.svg" width="24" alt=""/> | **Cost** | Tier mix is the whole cost story — run `--plan` on the real corpus before quoting. |
+| <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | **Verdict** | **Route by page count** — hybrid is the only configuration that produced a complete, usable corpus (![Live-tested](./assets/badges/live-tested.svg), 2026-08-20). |
+
+## Side by side
+
+[![Extraction tier comparison: Tier CU versus Tier DI+](./assets/extraction-tier-comparison.png)](./assets/extraction-tier-comparison.png)
+
+<sub>Editable source: [`assets/extraction-tier-comparison.drawio`](./assets/extraction-tier-comparison.drawio) - regenerate with `python scripts/export_diagrams.py docs/assets`.</sub>
 
 ---
 
 ## Run it yourself
+
+| Step | | Action | Gate |
+|---|---|---|---|
+| **1** | <img src="./assets/icons/foundry.svg" width="28" alt=""/> | `--build-cu` stands up Tier B beside the baseline | ☐ Tier B objects exist with a `-cu` suffix |
+| **2** | <img src="./assets/icons/ai-search.svg" width="28" alt=""/> | `--status` polls ingestion | ☐ Both tiers report finished |
+| **3** | <img src="./assets/icons/file.svg" width="28" alt=""/> | `--report` writes the scorecard to `out/` | ☐ Scorecard covers only documents **both** tiers ingested |
+| **4** | <img src="./assets/icons/gear.svg" width="28" alt=""/> | `--teardown` removes Tier B only | ☐ Baseline is untouched |
 
 ```bash
 cd scripts
@@ -55,6 +90,7 @@ specification), which is a realistic shape for hardware/firmware documentation.
 | Chunk size consistency | 34–6,116 chars | 204–2,317 chars | consistent per tier |
 | Relative ingestion cost | higher per page | **~half** per page | **CU price on most pages**, DI only where required |
 | **Answers a figure-only question?** | **No** | **Only if the doc is ≤300 pages** | **Yes** ✅ |
+| **Recommendation** | ❌ Blind to diagrams, silently | ❌ Misses 88% of the pages here | ✅ **Use this** — route by page count |
 
 ### Why each single-service option fails
 
@@ -180,6 +216,7 @@ If a meaningful share of the corpus exceeds 300 pages, you have three options:
 | **Hybrid**: CU for ≤300-page docs, DI Layout for the rest | Two skillsets, two indexes, mixed citation styles in one answer | Pragmatic when only a few documents are oversized and splitting is unacceptable |
 | **Stay on DI Layout** | Split tables, empty figures, misattributing citations | Only if oversized documents dominate and splitting is unacceptable |
 
+> [!IMPORTANT]
 > **Splitting fixes a second, independent problem.** Figure verbalization issues one vision
 > call per figure, so a 900-page document creates a burst large enough to exhaust the vision
 > deployment's requests-per-minute ceiling — which surfaces as a *misleading 30-second
@@ -197,7 +234,7 @@ Neither tier wins outright, so the pattern ships a **router** rather than a defa
 
 [![Hybrid routing by page count](./assets/hybrid-routing.png)](./assets/hybrid-routing.png)
 
-<sub>Editable source: [`assets/hybrid-routing.drawio`](./assets/hybrid-routing.drawio).</sub>
+<sub>Editable source: [`assets/hybrid-routing.drawio`](./assets/hybrid-routing.drawio) - regenerate with `python scripts/export_diagrams.py docs/assets`.</sub>
 
 ```bash
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --plan   --source-dir ../samples/corpus
@@ -233,6 +270,7 @@ for documents Content Understanding structurally cannot accept.
 | Escalation tier | Content Understanding (expensive) | **Document Layout + verbalization** (capability fallback) |
 | Trigger | per-field confidence, discovered *after* spend | **page count**, known *before* any spend |
 | Cost of routing | pay tier 1, then pay tier 2 on escalation | pay once — the decision is free |
+| **Recommendation** | Use the confidence cascade for field extraction | **Use the constraint router here** — never run a tier just to learn it was the wrong one |
 
 That second-to-last row is the real advantage: a confidence cascade must run the cheap tier
 on every document before it learns it needs the expensive one. A constraint router knows the
@@ -380,6 +418,8 @@ rather than choosing.
 
 ---
 
+## What the scorecard means
+
 ### Tables — 76.7% → 100%
 A table split across a chunk boundary loses its header row. The surviving cells are digits
 with no column meaning, which is *worse than omitting them* — a model will still try to
@@ -432,6 +472,10 @@ CU's semantic chunking stayed within **204–2,317**, respecting paragraph bound
 
 Content Understanding replaces **both** the Document Layout skill and the Split skill —
 per the skill reference: *"There's no need to use the Text Split skill in your skillset."*
+The skill itself is ![GA](./assets/badges/ga.svg); `chunkingProperties.method: "semantic"` is
+![Public preview](./assets/badges/public-preview.svg) (see [Verify before you quote](#verify-before-you-quote)).
+
+<details><summary><b>Show the full Content Understanding skill definition</b></summary>
 
 ```jsonc
 {
@@ -449,6 +493,8 @@ per the skill reference: *"There's no need to use the Text Split skill in your s
   "outputs": [ { "name": "text_sections", "targetName": "text_sections" } ]
 }
 ```
+
+</details>
 
 Index the page range instead of heading fields:
 
@@ -478,19 +524,19 @@ before quoting. Sources are linked per line.
 
 | Service | Unit | Price | Source |
 |---|---|---|---|
-| Document Intelligence — **Layout** (prebuilt tier) | per 1,000 pages | **$10.00** | [pricing](https://azure.microsoft.com/pricing/details/ai-document-intelligence/) |
-| Document Intelligence — free tier (F0) | pages/month | 500 free | same |
-| Content Understanding — document, **Minimal** | per 1,000 pages | **$0.01** | [pricing](https://azure.microsoft.com/pricing/details/content-understanding/) |
-| Content Understanding — document, **Basic** | per 1,000 pages | **$1.00** | same |
-| Content Understanding — document, **Standard** | per 1,000 pages | **$5.00** | same |
-| Content Understanding — contextualization (standard) | per 1M tokens | **$1.00** (1 page ≈ 1,000 tokens; 1 image ≈ 1,000 tokens) | [pricing explainer](https://learn.microsoft.com/azure/ai-services/content-understanding/pricing-explainer) |
-| `gpt-5.6-sol` | per 1M tokens | **$5.00 in / $30.00 out** (cached in $0.50) | [OpenAI pricing](https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/) |
-| `gpt-5.5` | per 1M tokens | **$5.00 in / $30.00 out** | same |
-| `text-embedding-3-large` | per 1M tokens | **$0.143** | same |
-| AI Search **Basic** (1 SU) | per hour | **$0.101** (~$73.73/mo at 730 h) | [Search pricing](https://azure.microsoft.com/pricing/details/search/) |
-| AI Search **Standard S1** | per hour | **$0.336** (~$245/mo) | same |
-| Semantic ranker | per 1,000 requests | first **1,000/month free**, then **$1.00** | same |
-| Blob Storage (Hot, LRS) | per GB/month | **$0.0208** | [Storage pricing](https://azure.microsoft.com/pricing/details/storage/blobs/) |
+| <img src="./assets/icons/document-intelligence.svg" width="20" alt=""/> Document Intelligence — **Layout** (prebuilt tier) | per 1,000 pages | **$10.00** | [pricing](https://azure.microsoft.com/pricing/details/ai-document-intelligence/) |
+| <img src="./assets/icons/document-intelligence.svg" width="20" alt=""/> Document Intelligence — free tier (F0) | pages/month | 500 free | same |
+| <img src="./assets/icons/foundry.svg" width="20" alt=""/> Content Understanding — document, **Minimal** | per 1,000 pages | **$0.01** | [pricing](https://azure.microsoft.com/pricing/details/content-understanding/) |
+| <img src="./assets/icons/foundry.svg" width="20" alt=""/> Content Understanding — document, **Basic** | per 1,000 pages | **$1.00** | same |
+| <img src="./assets/icons/foundry.svg" width="20" alt=""/> Content Understanding — document, **Standard** | per 1,000 pages | **$5.00** | same |
+| <img src="./assets/icons/foundry.svg" width="20" alt=""/> Content Understanding — contextualization (standard) | per 1M tokens | **$1.00** (1 page ≈ 1,000 tokens; 1 image ≈ 1,000 tokens) | [pricing explainer](https://learn.microsoft.com/azure/ai-services/content-understanding/pricing-explainer) |
+| <img src="./assets/icons/azure-openai.svg" width="20" alt=""/> `gpt-5.6-sol` | per 1M tokens | **$5.00 in / $30.00 out** (cached in $0.50) | [OpenAI pricing](https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/) |
+| <img src="./assets/icons/azure-openai.svg" width="20" alt=""/> `gpt-5.5` | per 1M tokens | **$5.00 in / $30.00 out** | same |
+| <img src="./assets/icons/azure-openai.svg" width="20" alt=""/> `text-embedding-3-large` | per 1M tokens | **$0.143** | same |
+| <img src="./assets/icons/ai-search.svg" width="20" alt=""/> AI Search **Basic** (1 SU) | per hour | **$0.101** (~$73.73/mo at 730 h) | [Search pricing](https://azure.microsoft.com/pricing/details/search/) |
+| <img src="./assets/icons/ai-search.svg" width="20" alt=""/> AI Search **Standard S1** | per hour | **$0.336** (~$245/mo) | same |
+| <img src="./assets/icons/ai-search.svg" width="20" alt=""/> Semantic ranker | per 1,000 requests | first **1,000/month free**, then **$1.00** | same |
+| <img src="./assets/icons/storage.svg" width="20" alt=""/> Blob Storage (Hot, LRS) | per GB/month | **$0.0208** | [Storage pricing](https://azure.microsoft.com/pricing/details/storage/blobs/) |
 
 **Indexer/skillset execution carries no separate AI Search charge.** Built-in skills get 20
 free documents per indexer per day; beyond that you pay only the underlying service rate.
@@ -528,7 +574,8 @@ verbalized. One-time ingestion cost:
 | **One-time total** | **≈ $10.36** | **≈ $0.73** | **≈ $16–19** |
 | **Corpus actually covered** | 100% pages, **0 figures** | **11.6% of pages** | **100% pages + 334 figures** |
 
-> ⚠️ **The vision line is an estimate, not a verified figure.** Microsoft does not currently
+> [!CAUTION]
+> **The vision line is an estimate, not a verified figure.** Microsoft does not currently
 > publish an image-to-token formula for the GPT-5 family — the only worked example in the
 > vision docs (`170 + 85` tokens) is tied to the legacy GPT-4 Turbo model and its own deep
 > link is stale. The range above is derived from *measured* output/reasoning tokens
@@ -666,19 +713,21 @@ Measured effect of the switch: CU-tier figure rows went from **0 → 78** on the
 
 ## Verify before you quote
 
-**Preview status — state this plainly to a customer.** The two capabilities this pattern leans
-on hardest are preview:
+> [!WARNING]
+> **Preview status — state this plainly to a customer.** The two capabilities this pattern
+> leans on hardest are preview. Do not quote them as GA, and do not promise an SLA for the
+> Content Understanding service until its status is confirmed.
 
-| Capability | Status |
-|---|---|
-| `chunkingProperties.method: "semantic"` (AI Search CU skill) | **Preview** — `2026-05-01-preview` API |
-| `modelName` / `modelDeployment` figure descriptions (AI Search CU skill) | **Preview** — same API version |
-| `ContentUnderstandingSkill` itself | **GA** in Search REST API `2026-04-01` |
-| Content Understanding service | **Unresolved in Microsoft's own docs** — the pricing page FAQ says "public preview… does not have an SLA", while the pricing-explainer describes GA behavior for API `2025-11-01`. Confirm current status before committing a customer to an SLA. |
-| Azure AI Search **Knowledge Base** + native MCP endpoint | Real, documented capability; the agentic-retrieval surface has moved quickly (renamed from "Knowledge Agents" in 2026) — re-verify the API version before a customer build |
+| | Capability | Status |
+|---|---|---|
+| <img src="./assets/icons/foundry.svg" width="20" alt=""/> | `chunkingProperties.method: "semantic"` (AI Search CU skill) | ![Public preview](./assets/badges/public-preview.svg) `2026-05-01-preview` API |
+| <img src="./assets/icons/foundry.svg" width="20" alt=""/> | `modelName` / `modelDeployment` figure descriptions (AI Search CU skill) | ![Public preview](./assets/badges/public-preview.svg) same API version |
+| <img src="./assets/icons/foundry.svg" width="20" alt=""/> | `ContentUnderstandingSkill` itself | ![GA](./assets/badges/ga.svg) in Search REST API `2026-04-01` |
+| <img src="./assets/icons/foundry.svg" width="20" alt=""/> | Content Understanding service | ⏳ **Unresolved in Microsoft's own docs** — the pricing page FAQ says "public preview… does not have an SLA", while the pricing-explainer describes GA behavior for API `2025-11-01`. Confirm current status before committing a customer to an SLA. |
+| <img src="./assets/icons/ai-search.svg" width="20" alt=""/> | Azure AI Search **Knowledge Base** + native MCP endpoint | ![Public preview](./assets/badges/public-preview.svg) `2026-05-01-preview` API — a real, documented capability; the agentic-retrieval surface has moved quickly (renamed from "Knowledge Agents" in 2026) — re-verify the API version before a customer build |
 
-The Tier DI+ path (`DocumentIntelligenceLayoutSkill` + `ChatCompletionSkill`) is **GA on both
-skills**, which is worth noting: if a customer cannot accept preview components, the hybrid
+The Tier DI+ path (`DocumentIntelligenceLayoutSkill` + `ChatCompletionSkill`) is ![GA](./assets/badges/ga.svg) on
+both skills, which is worth noting: if a customer cannot accept preview components, the hybrid
 degrades to the DI+ tier for the whole corpus — losing chunk quality and cost efficiency, but
 **not** losing figure comprehension, because the vision skill is GA.
 
@@ -707,4 +756,6 @@ committing a customer to it.
 
 ---
 
-*Last updated: 2026-09-30*
+Next: [09 - Findings and lessons](./09-findings-and-lessons.md) →
+
+*Last updated: 2026-10-02*

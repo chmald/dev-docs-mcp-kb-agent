@@ -1,13 +1,48 @@
+[README](../README.md) › [docs index](./00-reproduce-this-demo.md) › 00 Reproduce this demo
+
 # 00 — Stand this demo up from scratch
 
-> **Audience.** Someone cloning this repo to build the full demo against a fresh Azure
-> subscription. Each part is a checkpoint — finish A before starting B. Deep-dive runbooks are
-> linked rather than duplicated.
+<p>
+<img src="./assets/icons/subscription.svg" width="40" alt="Azure subscription"/>&nbsp;
+<img src="./assets/icons/azure-devops.svg" width="40" alt="Azure Developer CLI"/>&nbsp;
+<img src="./assets/icons/ai-search.svg" width="40" alt="Azure AI Search"/>&nbsp;
+<img src="./assets/icons/document-intelligence.svg" width="40" alt="Document Intelligence"/>&nbsp;
+<img src="./assets/icons/azure-openai.svg" width="40" alt="Azure OpenAI"/>&nbsp;
+<img src="./assets/icons/blob-block.svg" width="40" alt="Blob Storage"/>&nbsp;
+<img src="./assets/icons/code.svg" width="40" alt="VS Code and GitHub Copilot"/>
+</p>
 
-> **Time budget.** First build: **1.5–3 hours**, dominated by (a) model + AI Search
-> provisioning waits and (b) ingestion, which scales with corpus size — a 906-page document
-> with figure verbalization takes ~45 minutes on its own. Subsequent rebuilds in the same
-> tenant: well under an hour.
+![Version](./assets/badges/version.svg) ![Live-tested](./assets/badges/live-tested.svg) ![Static-only](./assets/badges/static-only.svg) ![Public preview](./assets/badges/public-preview.svg)
+
+The single-page orchestrator for building this demo against a fresh Azure subscription, from empty tenant to a Copilot Chat question answered from a figure. Each of the six parts (A–F) ends in a checkpoint — finish one before starting the next. Deep-dive runbooks are linked rather than duplicated.
+
+## At a glance
+
+| | Topic | One-line answer |
+|---|---|---|
+| <img src="./assets/icons/subscription.svg" width="24" alt=""/> | **Who it is for** | Someone cloning this repo to build the full demo against a fresh Azure subscription |
+| <img src="./assets/icons/azure-devops.svg" width="24" alt=""/> | **Shortcut** | `azd up` replaces A1–A3 ([03 § Fast path](./03-deployment.md#fast-path--azd-up)) ![Static-only](./assets/badges/static-only.svg) |
+| <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | **Slow parts** | Model + AI Search provisioning waits, and ingestion, which scales with corpus size |
+| <img src="./assets/icons/code.svg" width="24" alt=""/> | **Done when** | A question answerable only from a *figure* returns a grounded, cited answer in Copilot Chat |
+
+> [!NOTE]
+> **Audience.** Each part is a checkpoint — finish A before starting B. Deep-dive runbooks are linked rather than duplicated.
+
+## Time budget
+
+First build: **1.5–3 hours**, dominated by (a) model + AI Search provisioning waits and (b) ingestion, which scales with corpus size — a 906-page document with figure verbalization takes ~45 minutes on its own. Subsequent rebuilds in the same tenant: well under an hour.
+
+| Part | | What | Where the time goes |
+|---|---|---|---|
+| **A** | <img src="./assets/icons/resource-group.svg" width="24" alt=""/> | Provision the platform | Model + AI Search provisioning waits |
+| **B** | <img src="./assets/icons/blob-block.svg" width="24" alt=""/> | Route and upload the corpus | Quick; `--plan` is free |
+| **C** | <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | Build both tiers and ingest | **Dominant** — Tier DI+ ~45 min for a 906-page spec; Tier CU much faster |
+| **D** | <img src="./assets/icons/monitor.svg" width="24" alt=""/> | Verify retrieval and the MCP endpoint | Minutes |
+| **E** | <img src="./assets/icons/code.svg" width="24" alt=""/> | Wire GitHub Copilot | Minutes |
+| **F** | <img src="./assets/icons/powershell.svg" width="24" alt=""/> | Rehearse; optional repository export | Minutes |
+
+> [!TIP]
+> Faster path: `azd up` replaces Parts A1–A3 with one command — see the callout under Part A.
 
 ---
 
@@ -27,6 +62,19 @@ evidence and cost model behind that decision.
 
 Full detail in [02-prerequisites.md](./02-prerequisites.md). Do not skip the first three —
 each has cost a real build time.
+
+| | Prerequisite | Gate |
+|---|---|---|
+| <img src="./assets/icons/subscription.svg" width="24" alt=""/> | Azure subscription with Contributor + RBAC-admin on the target resource group | ☐ |
+| <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | **AI Search regional _capacity_ confirmed** | ☐ |
+| <img src="./assets/icons/policy.svg" width="24" alt=""/> | **Storage / Key Vault public network access reachable** | ☐ |
+| <img src="./assets/icons/azure-openai.svg" width="24" alt=""/> | Model quota in-region for `text-embedding-3-large` (**Standard** SKU) and the chat/vision models | ☐ |
+| <img src="./assets/icons/powershell.svg" width="24" alt=""/> | `az` CLI ≥ 2.60, **PowerShell 7 (`pwsh`)**, Python 3.11+ | ☐ |
+| <img src="./assets/icons/code.svg" width="24" alt=""/> | **VS Code with the GitHub Copilot Chat extension** (`github.copilot-chat`) | ☐ |
+| <img src="./assets/icons/file.svg" width="24" alt=""/> | A PDF corpus you have the right to index (see [../samples/README.md](../samples/README.md)) | ☐ |
+
+> [!IMPORTANT]
+> A region can list Basic as available and still reject AI Search creation with `InsufficientResourcesAvailable` — that is capacity, not quota. Governed subscriptions may force `publicNetworkAccess: Disabled` on Storage / Key Vault and silently revert an override.
 
 - [ ] Azure subscription with Contributor + RBAC-admin on the target resource group
 - [ ] **AI Search regional _capacity_ confirmed** — a region can list Basic as available and
@@ -65,8 +113,15 @@ pip install -r scripts/requirements.txt
 
 ## Part A — Provision the platform
 
+| Step | | Action | Gate |
+|---|---|---|---|
+| **A1** | <img src="./assets/icons/entra-id.svg" width="24" alt=""/> | Authenticate to the intended tenant/subscription | ☐ `az account show` matches the target |
+| **A2** | <img src="./assets/icons/resource-group.svg" width="24" alt=""/> | Deploy the Bicep (`deploy.ps1`) | ☐ `demo-ids.local.json` written |
+| **A3** | <img src="./assets/icons/azure-openai.svg" width="24" alt=""/> | Frontier model deployments (usually created by the Bicep) | ☐ `embedding`, `chat`, `sol`, `vision` listed |
+
+> [!TIP]
 > **One command instead of A1–A3:** `azd up` provisions everything below, writes
-> `demo-ids.local.json` and can ingest your corpus in the same run. Steps and settings:
+> `demo-ids.local.json` and can ingest your corpus in the same run ![Static-only](./assets/badges/static-only.svg). Steps and settings:
 > [03 § Fast path — azd up](./03-deployment.md#fast-path--azd-up) and
 > [12-configuration-reference.md](./12-configuration-reference.md). Then continue at Part B
 > (or Part C if you set `DEMO_CORPUS_DIR`).
@@ -93,6 +148,9 @@ The Bicep now creates all four deployments (`embedding`, `chat`, `vision`, `sol`
 commands below only if you deployed with `deployHybridModels=false` / `DEPLOY_HYBRID_MODELS=false`
 (names must match `demo-ids.local.json`):
 
+<details>
+<summary><b>The two <code>az cognitiveservices</code> commands (only if <code>deployHybridModels=false</code>)</b></summary>
+
 ```bash
 # Figure verbalization, BOTH tiers. Deliberately a NON-reasoning model: the
 # vision skill has a fixed 30s timeout whose failure mode is total (one slow
@@ -111,6 +169,9 @@ az cognitiveservices account deployment create -n <foundry> -g <rg> --deployment
 az cognitiveservices account deployment create -n <foundry> -g <rg> --deployment-name sol --model-name gpt-5.6-sol --model-version 2026-07-09 --model-format OpenAI --sku-name GlobalStandard --sku-capacity 200
 ```
 
+</details>
+
+> [!WARNING]
 > A brand-new deployment is not immediately usable, and it fails in three different-looking
 > ways: `DeploymentIdNotFound`, `FigureUnderstandingSkipped` ("the model deployment returned
 > an error"), or a vision-skill `InternalServerError`. All three mean the deployment is not
@@ -122,6 +183,12 @@ az cognitiveservices account deployment create -n <foundry> -g <rg> --deployment
 ---
 
 ## Part B — Route and upload the corpus
+
+| Step | | Action | Gate |
+|---|---|---|---|
+| **B1** | <img src="./assets/icons/file.svg" width="24" alt=""/> | Split oversized documents (`--split`) ![Default](./assets/badges/default.svg) | ☐ no part over 300 pages |
+| **B2** | <img src="./assets/icons/folder.svg" width="24" alt=""/> | See the routing plan (`--plan`, free) | ☐ tier split understood |
+| **B3** | <img src="./assets/icons/blob-block.svg" width="24" alt=""/> | Upload into the tier prefixes (`--upload`) | ☐ blobs under `raw/cu/` and/or `raw/di/` |
 
 ### B1. Split oversized documents (strongly recommended)
 
@@ -171,6 +238,14 @@ script no longer makes it silently.
 
 ## Part C — Build both tiers and ingest
 
+| Step | | Action | Gate |
+|---|---|---|---|
+| **C1** | <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | `--build` — index, skillsets, data sources, indexers, knowledge source and knowledge base | ☐ command completes |
+| **C2** | <img src="./assets/icons/monitor.svg" width="24" alt=""/> | Poll `--status` until ingestion finishes | ☐ both indexers `success` |
+
+> [!NOTE]
+> **Expect this to take a while** — this is the dominant cost of a first build (see the time budget above).
+
 ```bash
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --build
 python hybrid_ingest.py --ids-file ../demo-ids.local.json --status
@@ -196,6 +271,11 @@ Full detail: [03-deployment.md § Phase 2](./03-deployment.md#phase-2--hybrid-in
 
 ## Part D — Verify retrieval and the MCP endpoint
 
+| Step | | Action | Gate |
+|---|---|---|---|
+| **D1** | <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | `post_deploy_search.py --check-mcp-endpoint` ![Live-tested](./assets/badges/live-tested.svg) | ☐ native MCP endpoint answers |
+| **D2** | <img src="./assets/icons/dev-console.svg" width="24" alt=""/> | Run the [04-testing.md](./04-testing.md) test plan | ☐ both tiers contribute (tier-provenance check) |
+
 ```bash
 python post_deploy_search.py --ids-file ../demo-ids.local.json --check-mcp-endpoint
 ```
@@ -207,6 +287,14 @@ golden-set checks, including the tier-provenance check that proves both tiers ar
 
 ## Part E — Wire GitHub Copilot
 
+| Step | | Action | Gate |
+|---|---|---|---|
+| **E1** | <img src="./assets/icons/code.svg" width="24" alt=""/> | Add `.vscode/mcp.json` pointing at the hybrid knowledge base; reload VS Code | ☐ server listed in Copilot Chat |
+| **E2** | <img src="./assets/icons/file.svg" width="24" alt=""/> | Ask a figure-only corpus question in agent mode | ☐ grounded, cited answer |
+
+> [!NOTE]
+> Requires `github.copilot-chat` — `ms-azuretools.vscode-azure-github-copilot` is a *different* extension and is not enough.
+
 Add `.vscode/mcp.json` pointing at the **hybrid** knowledge base and reload VS Code, then ask
 a corpus question in Copilot Chat (agent mode). Exact JSON and verification steps:
 [07-github-copilot-mcp-client-setup.md](./07-github-copilot-mcp-client-setup.md).
@@ -217,6 +305,11 @@ the source document — that is the whole pattern working end to end.
 ---
 
 ## Part F — Rehearse, and optionally export to a repository
+
+| Step | | Action | Gate |
+|---|---|---|---|
+| **F1** | <img src="./assets/icons/powershell.svg" width="24" alt=""/> | Run `demo_walkthrough.py` ![Static-only](./assets/badges/static-only.svg) | ☐ `5/5 steps passed` |
+| **F2** | <img src="./assets/icons/folder.svg" width="24" alt=""/> | *(Optional)* export the corpus to a repository ![Opt-in](./assets/badges/opt-in.svg) | ☐ `out/repo-export/README.md` lists every document |
 
 ```bash
 python demo_walkthrough.py --ids-file ../demo-ids.local.json --script ../samples/walkthrough.example.json --report
@@ -238,14 +331,14 @@ python export_repo_corpus.py --ids-file ../demo-ids.local.json --export --out ..
 
 ## Single-page checklist
 
-| Part | What | Done |
-|---|---|---|
-| A | Provision platform (Bicep) + frontier model deployments | [ ] |
-| B | Route by page count and upload to tier prefixes | [ ] |
-| C | Build both tiers, ingest, confirm both indexers succeed | [ ] |
-| D | Verify retrieval + native MCP endpoint | [ ] |
-| E | Wire GitHub Copilot and ask a figure-only question | [ ] |
-| F | Walkthrough passes 5/5; *(optional)* repository export generated | [ ] |
+| Part | | What | Done |
+|---|---|---|---|
+| A | <img src="./assets/icons/resource-group.svg" width="24" alt=""/> | Provision platform (Bicep) + frontier model deployments | [ ] |
+| B | <img src="./assets/icons/blob-block.svg" width="24" alt=""/> | Route by page count and upload to tier prefixes | [ ] |
+| C | <img src="./assets/icons/ai-search.svg" width="24" alt=""/> | Build both tiers, ingest, confirm both indexers succeed | [ ] |
+| D | <img src="./assets/icons/monitor.svg" width="24" alt=""/> | Verify retrieval + native MCP endpoint | [ ] |
+| E | <img src="./assets/icons/code.svg" width="24" alt=""/> | Wire GitHub Copilot and ask a figure-only question | [ ] |
+| F | <img src="./assets/icons/powershell.svg" width="24" alt=""/> | Walkthrough passes 5/5; *(optional)* repository export generated | [ ] |
 
 Then run [04-testing.md](./04-testing.md) before calling it demo-ready. If anything fails,
 [05-troubleshooting.md](./05-troubleshooting.md) is organised by symptom.
@@ -259,9 +352,12 @@ python hybrid_ingest.py --ids-file ../demo-ids.local.json --teardown   # Search 
 az group delete --name rg-ddmcp-dev-eastus --yes --no-wait             # everything
 ```
 
-AI Search Basic and the model deployments bill continuously — tear down when the demo is not
-in use.
+> [!CAUTION]
+> AI Search Basic and the model deployments bill continuously — tear down when the demo is not
+> in use. `az group delete` removes everything in the resource group.
 
 ---
 
-*Last updated: 2026-09-30*
+Next: [01 - Architecture](./01-architecture.md) →
+
+*Last updated: 2026-10-02*

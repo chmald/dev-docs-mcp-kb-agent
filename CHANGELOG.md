@@ -6,7 +6,7 @@ Change history for this pattern. Entries are listed newest-first.
 
 ## 2026-10-02
 
-### Diagram visual refresh — official icons, status pills, legends (v1.2.1)
+### Visual refresh — official icons, status pills, legends, nine new diagrams, docs on the visual standard (v1.2.1)
 
 | Change | Why |
 |---|---|
@@ -15,6 +15,12 @@ Change history for this pattern. Entries are listed newest-first.
 | **Status pills + legend on every diagram** — GA, PREVIEW, DEFAULT, OPTIONAL, OPT-IN (walkthrough: PASS / FAIL). PREVIEW marks Tier CU semantic chunking and the knowledge base / native MCP endpoint (`2026-05-01-preview`), matching docs/08 › Verify before you quote | A customer can see at a glance what is preview, what is the default path and what can be skipped |
 | **Accent bar, Segoe UI throughout, footer credit** (pattern · diagram · version · icon source) | Slide-ready, consistent look across all eight |
 | README "Diagrams" note explains the icons and pills; the README assets row lists all eight diagrams; docs/01 ties the PREVIEW pills to the docs/08 status table | The docs described four diagrams and didn't explain the new visual vocabulary |
+| **Docs retrofitted to the visual doc standard** (same day): every page now has a breadcrumb, a hero row of official product icons, status badges, an *At a glance* table, icons in service tables, GitHub alert callouts, step cards, collapsible long blocks, a Next link and a footer. `docs/11` was expanded into a full run-of-show with step cards and a "do not show" list | Docs were text and plain tables; the reference demo standard makes them skimmable and forwardable |
+| **Nine new diagrams**: service-catalog poster (README), prerequisites map (02), manual deployment steps (03b), testing matrix (04), three-page troubleshooting decision tree (05), native MCP endpoint vs wrapper (06), Copilot MCP client flow (07), Tier CU vs Tier DI+ comparison (08), numbers-that-matter infographic (09) | Every doc now has a diagram for the flow, decision or comparison it describes |
+| **Honest status badges**: `live-tested` only for hybrid ingestion, unified index, knowledge-base retrieval and the native MCP endpoint (Aug 2026 clean-room rebuilds); `static-only` for `azd up`, repo export and the walkthrough | Badges must never claim a live run that didn't happen |
+| `docs/assets/icons/` (official icons + attribution) and `docs/assets/badges/` (local SVG badges); `scripts/lint_doc_visuals.py` + `tests/test_doc_visuals.py` | Assets render offline; the lint keeps the standard from regressing |
+| Fixed: `scripts/export_diagrams.py` passed a 0-based `--page-index` (draw.io expects 1-based), which broke multi-page export; `scripts/check_doc_links.py` now strips inline HTML from headings before slugging (icon-led headings) | Found while adding the three-page decision tree |
+| Fixed doc drift on models: docs/01 and docs/02 now match the Bicep and docs/12 — four deployments (`embedding`, `chat` `gpt-5-mini`, `vision` `gpt-4.1`, `sol` `gpt-5.6-sol`); figures use `gpt-4.1`, not the frontier model | docs/01 and docs/02 still described the pre-v1.2 model set |
 
 Geometry, edges and wording of every diagram are unchanged; PNGs re-exported and visually reviewed
 (`scripts/export_diagrams.py docs/assets --check` reports 0 stale).
