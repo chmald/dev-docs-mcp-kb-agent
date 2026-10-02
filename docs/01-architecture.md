@@ -59,6 +59,7 @@ Full measurements, the DI-only vs CU-only vs hybrid comparison, and cost:
 
 <sub>Editable source: [`assets/dev-docs-mcp-knowledge-agent-architecture.drawio`](./assets/dev-docs-mcp-knowledge-agent-architecture.drawio) — open in VS Code (draw.io extension) or app.diagrams.net; regenerate the PNG with `python scripts/export_diagrams.py docs/assets`.</sub>
 
+The pills on each component follow the legend at the bottom of the diagram. The two **PREVIEW** pills, Tier CU (semantic chunking) and the knowledge base plus its native MCP endpoint, are the components listed in [docs/08 › Verify before you quote](./08-extraction-tier-comparison.md#verify-before-you-quote). A customer that cannot accept preview components runs the GA Tier DI+ path for the whole corpus.
 | Tier | Components | Role |
 |---|---|---|
 | 1 · Source | Technical PDFs; optional page-ranged split parts | Bring-your-own corpus; `--split` keeps original page numbers in part names |
@@ -230,4 +231,4 @@ the cost. Run `--plan` against a real corpus before quoting anything.
 
 ---
 
-*Last updated: 2026-09-30*
+*Last updated: 2026-10-02*

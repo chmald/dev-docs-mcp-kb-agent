@@ -4,6 +4,23 @@ Change history for this pattern. Entries are listed newest-first.
 
 ---
 
+## 2026-10-02
+
+### Diagram visual refresh — official icons, status pills, legends (v1.2.1)
+
+| Change | Why |
+|---|---|
+| **All eight diagrams moved to the official Microsoft Azure Architecture Icons (V24)**, embedded as data URIs (`iconKey` + embed step) instead of draw.io's bundled `img/lib/azure2` library; Foundry, Foundry Models, Document Intelligence and AI Search now use their current icons | The bundled library predates the Foundry icons, and embedded icons render identically offline, in the VS Code extension and in the PNG export |
+| **Icon-inside-tile for every service and script tile**, emoji glyphs removed; layer containers carry a header icon | Edges attach to tile borders and never cross a label; one icon size per diagram |
+| **Status pills + legend on every diagram** — GA, PREVIEW, DEFAULT, OPTIONAL, OPT-IN (walkthrough: PASS / FAIL). PREVIEW marks Tier CU semantic chunking and the knowledge base / native MCP endpoint (`2026-05-01-preview`), matching docs/08 › Verify before you quote | A customer can see at a glance what is preview, what is the default path and what can be skipped |
+| **Accent bar, Segoe UI throughout, footer credit** (pattern · diagram · version · icon source) | Slide-ready, consistent look across all eight |
+| README "Diagrams" note explains the icons and pills; the README assets row lists all eight diagrams; docs/01 ties the PREVIEW pills to the docs/08 status table | The docs described four diagrams and didn't explain the new visual vocabulary |
+
+Geometry, edges and wording of every diagram are unchanged; PNGs re-exported and visually reviewed
+(`scripts/export_diagrams.py docs/assets --check` reports 0 stale).
+
+---
+
 ## 2026-09-30
 
 ### One-command `azd up`, configuration reference, all visuals as draw.io PNGs (v1.2.0)

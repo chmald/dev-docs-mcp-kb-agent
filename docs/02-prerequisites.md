@@ -26,7 +26,7 @@ This pattern runs on **Windows, Linux, and macOS**. Nothing in it is Windows-spe
 | Azure CLI (`az`) | 2.60 | <https://aka.ms/installazurecli> |
 | Azure Developer CLI (`azd`) | 1.10 (validated with 1.34) | <https://aka.ms/azd-install> — for the one-command `azd up` path |
 | PowerShell (`pwsh`) | 7.0 | <https://aka.ms/powershell> — needed on Linux/macOS too, for `deploy.ps1` and the azd hooks |
-| draw.io desktop | current | Only to re-export diagram PNGs after editing a `.drawio` (`scripts/export_diagrams.py`) |
+| draw.io desktop | current | Only to re-export diagram PNGs after editing a `.drawio` (`scripts/export_diagrams.py`). Icons are embedded in each `.drawio`, so no icon library or network access is needed |
 | Python | 3.11 | <https://python.org> |
 | VS Code + **GitHub Copilot Chat** (`github.copilot-chat`) | current | For the consumption step in [07](./07-github-copilot-mcp-client-setup.md) |
 
@@ -198,4 +198,4 @@ Confirm all of these before moving to [03-deployment.md](./03-deployment.md):
 
 ---
 
-*Last updated: 2026-08-24*
+*Last updated: 2026-10-02*

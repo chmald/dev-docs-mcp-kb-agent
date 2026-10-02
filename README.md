@@ -37,6 +37,8 @@ The pattern produces **two complementary outputs** from the same documents:
 And a scripted, self-checking customer demo ([docs/11](./docs/11-customer-walkthrough.md)) that proves both the prose path and the figure path before you present.
 
 > **Diagrams.** Every diagram in these docs is a PNG exported from a `.drawio` source that sits next to it in `docs/assets/` — the PNG renders everywhere (GitHub, Azure DevOps, VS Code, email, slides); the `.drawio` is what you edit. `python scripts/export_diagrams.py docs/assets --check` fails if a PNG is older than its source.
+>
+> **Reading them.** Icons are the official Microsoft Azure Architecture Icons (V24), embedded in each `.drawio` so it opens offline. Status pills mark each component: **GA**, **PREVIEW** (preview API or feature — see the [preview-status table](./docs/08-extraction-tier-comparison.md#verify-before-you-quote)), **DEFAULT** (the path the demo takes), **OPTIONAL** (can be skipped) and **OPT-IN** (off until enabled in config). Every diagram carries its own legend.
 
 ---
 
@@ -81,7 +83,7 @@ All narrative documentation lives under `docs/`, in build order. The repo root h
 | **docs/10-repo-corpus-export.md** | **PDF → repository package**: page-cited Markdown sections, original figure images, Mermaid, and opt-in register/pin/electrical extraction. Index vs. export vs. both, compared |
 | **docs/12-configuration-reference.md** | **Every configurable value** — azd environment variables, hook knobs, `deploy.ps1` parameters, `demo-ids.local.json` keys, runtime environment variables — with defaults and consumers |
 | **docs/11-customer-walkthrough.md** | **Scripted customer demo** with expected citations and pass/fail — rehearse with it, present with `--present` |
-| docs/assets/*.drawio + *.png | Diagram sources and their exported PNGs: reference architecture, hybrid routing, repository export, customer walkthrough. Embed the PNG; edit the `.drawio` |
+| docs/assets/*.drawio + *.png | Diagram sources and their exported PNGs (eight): reference architecture, deployed topology, `azd up` flow, configuration flow, hybrid routing, repository export pipeline, repository package layout, customer walkthrough. Embed the PNG; edit the `.drawio` |
 | azure.yaml | Azure Developer CLI template — `azd up` |
 | infra/ | Bicep IaC: `main.bicep` (shared by every path), `azd.bicep` + `azd.parameters.json` (azd entry point), `modules/`, `deploy.ps1`, and `hooks/` (azd pre/postprovision + helpers shared with `deploy.ps1`) |
 | scripts/hybrid_ingest.py | **The production path** — page-count router, both ingestion tiers, unified index, knowledge base |
